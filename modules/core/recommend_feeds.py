@@ -54,8 +54,18 @@ class RecommendationService:
         """Generate a Redis cache key for a given student ID."""
         return f"recommendations:{student_id}"
 
-    def recommend(self, student_id: str) -> RecommendationResponse:
+    def recommend(
+        self,
+        student_id: str,
+        *,
+        index_endpoint: str | None = None,
+        deployed_index_id: str | None = None,
+    ) -> RecommendationResponse:
         """Get feed recommendations from cache, vector search, or fallback."""
+        active_vector_search = self._resolve_vector_search(
+            index_endpoint=index_endpoint,
+            deployed_index_id=deployed_index_id,
+        )
         cache_key = self._key(student_id)
         cached_response = self._get_cached_response(cache_key)
         
@@ -72,7 +82,11 @@ class RecommendationService:
 
         try:
             print(f"Embeddings retrieved for {student_id}, proceeding with vector search...")
-            response = self._build_vector_response(student_id=student_id, embeddings=embeddings)
+            response = self._build_vector_response(
+                student_id=student_id,
+                embeddings=embeddings,
+                vector_search=active_vector_search,
+            )
             minimum_recommendation = self.settings.recommendation.minimum_recommendation
             if len(response.recommendations) < minimum_recommendation:
                 print(
@@ -106,9 +120,10 @@ class RecommendationService:
         *,
         student_id: str,
         embeddings: list[list[float]],
+        vector_search: VectorSearchClient,
     ) -> RecommendationResponse:
         """Build a recommendation response using vector search results."""
-        search_results = search_neighbors_async(embeddings, vector_search=self.vector_search)
+        search_results = search_neighbors_async(embeddings, vector_search=vector_search)
 
         print(f"Vector search completed for {student_id}, processing results...")
         reranked = rerank_neighbors(
@@ -123,6 +138,29 @@ class RecommendationService:
             student_id=student_id,
             source="vertex_vector_search",
             recommendations=recommendations,
+        )
+
+    def _resolve_vector_search(
+        self,
+        *,
+        index_endpoint: str | None,
+        deployed_index_id: str | None,
+    ) -> VectorSearchClient:
+        effective_index_endpoint = (index_endpoint or "").strip() or self.settings.vertex.index_endpoint
+        effective_deployed_index_id = (deployed_index_id or "").strip() or self.settings.vertex.deployed_index_id
+
+        if (
+            effective_index_endpoint == self.settings.vertex.index_endpoint
+            and effective_deployed_index_id == self.settings.vertex.deployed_index_id
+        ):
+            return self.vector_search
+
+        return VectorSearchClient(
+            index_endpoint=effective_index_endpoint,
+            deployed_index_id=effective_deployed_index_id,
+            neighbor_count=self.settings.vertex.neighbor_count,
+            return_full_datapoint=self.settings.vertex.return_full_datapoint,
+            restricts_list=self.settings.vertex.restricts_list,
         )
 
     def _build_fallback_response(

@@ -1,8 +1,14 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class VertexRequest(BaseModel):
+    index_endpoint: str | None = None
+    deployed_index_id: str | None = None
+
+
 class RecommendationRequest(BaseModel):
     student_id: str = Field(..., min_length=1)
+    vertex: VertexRequest | None = None
 
 
 class FeedsMetadata(BaseModel):

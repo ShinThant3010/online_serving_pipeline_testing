@@ -37,6 +37,10 @@ def recommend(
     """Endpoint to get feed recommendations for a student."""
     try:
         print(f"Received recommendation request for student_id: {payload.student_id}")
-        return service.recommend(payload.student_id)
+        return service.recommend(
+            payload.student_id,
+            index_endpoint=payload.vertex.index_endpoint if payload.vertex else None,
+            deployed_index_id=payload.vertex.deployed_index_id if payload.vertex else None,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
