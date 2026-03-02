@@ -1,0 +1,38 @@
+app:
+  host: 0.0.0.0
+  port: 8080
+
+cache:
+  redis_host: 10.86.221.99
+  redis_port: 6379
+  ttl_seconds: 3600
+  redis_timeout_seconds: 0.5
+
+hyde_data:
+  bucket: "hyde-datalake-feeds"
+  embedding_prefix: embedding
+  query_prefix: hyde
+  metadata_prefix: metadata
+
+vertex:
+  index_endpoint: "projects/810737581373/locations/asia-southeast1/indexEndpoints/6583602948238999552"
+  deployed_index_id: "feeds_items_deployed"
+  neighbor_count: 50
+  return_full_datapoint: false
+  # restricts_list:
+  #   language: "th"
+  #   tags:
+  #     - "university"
+
+bigquery:
+  fallback_table: "poc-piloturl-nonprod.gold_layer.feeds"
+  fallback_limit: 50
+
+trigger_hyde_generation:
+  http_timeout_seconds: 60
+  refresh_cooldown_seconds: 300
+  recommendation_api_base_url: "https://hyderecomment-service-du7yhkyaqq-as.a.run.app"
+  recommendation_path: "/hyde/students/{student_id}"
+
+recommendation:
+  minimum_recommendation: 3

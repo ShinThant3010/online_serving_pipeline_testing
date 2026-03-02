@@ -1,0 +1,151 @@
+# ======================================================================================
+# parameters/parameters.yaml
+#
+# IMPORTANT
+# ---------
+# This file defines the *target production configuration shape*.
+#
+# In the current HyDE Feed Recommendation POC:
+# - Many values are read, but some are **NOT actively enforced**
+# - Several sections are **placeholders for production parity**
+#
+# All POC behavior is intentionally deterministic and code-driven.
+# Treat this file as:
+#   - documentation of intended knobs, AND
+#   - a forward-compatible contract for production rollout
+# ======================================================================================
+
+# --------------------------------------------------------------------------------------
+# App-level metadata
+# --------------------------------------------------------------------------------------
+app:
+  name: poc_hyde_feed_recommendation
+  timezone: UTC
+  # NOTE (POC):
+  # - Used mainly for logging / metadata echo
+  # - No timezone conversion logic is applied in POC
+
+
+# --------------------------------------------------------------------------------------
+# Raw input data locations (POC only)
+# --------------------------------------------------------------------------------------
+data:
+  feeds_path: data/feeds.jsonl
+  students_path: data/students.csv
+  interactions_path: data/interactions.csv
+  # NOTE (POC):
+  # - These paths are used only in batch/offline pipelines
+  # - Online serving NEVER reads raw CSV/JSON directly
+
+
+# --------------------------------------------------------------------------------------
+# Artifact locations (USED in POC)
+# --------------------------------------------------------------------------------------
+artifacts:
+  feed_index_dir: artifacts/feed_index
+  user_query_bundles_dir: artifacts/user_query_bundles
+  # USED:
+  # - feed_index_dir → FAISS index + feeds_meta.jsonl
+  # - user_query_bundles_dir → cached HyDE queries + embeddings
+  #
+  # In production:
+  # - feed_index_dir will be replaced by Vertex AI Vector Search
+  # - user_query_bundles_dir remains (or moves to GCS / DB)
+
+
+# --------------------------------------------------------------------------------------
+# LLM configuration (PARTIALLY USED in POC)
+# --------------------------------------------------------------------------------------
+llm:
+  model_name: gemini-2.5-flash
+  max_output_tokens: 2048
+  temperature: 0.2
+  # USED:
+  # - model_name, max_output_tokens, temperature
+  #   are consumed by GeminiJsonClient
+  #
+  # NOTE:
+  # - Online serving NEVER calls the LLM
+  # - LLM is used ONLY in:
+  #     - pipeline_1_user_hyde (batch)
+  #     - pipeline_2_user_hyde_refresh (online refresh, not serving path)
+
+
+# --------------------------------------------------------------------------------------
+# HyDE generation parameters (USED in POC)
+# --------------------------------------------------------------------------------------
+hyde:
+  history_threshold: 5
+  recent_k: 5
+  feed_text_max_chars: 240
+  retry_limit: 2
+  prompt_version: v2
+  # USED:
+  # - history_threshold → whether to include history summary
+  # - recent_k / feed_text_max_chars → history snippet construction
+  # - retry_limit → GeminiJsonClient retry policy
+  #
+  # NOTE:
+  # - prompt_version is informational in POC
+  # - Prompt selection is still code-driven
+
+
+# --------------------------------------------------------------------------------------
+# Retrieval configuration (USED in POC)
+# --------------------------------------------------------------------------------------
+retrieval:
+  top_k_per_query: 30
+  max_candidates: 10
+  agg_mode: WEIGHTED_MAX          # WEIGHTED_MAX | WEIGHTED_MEAN
+  recency_half_life_days: 30.0
+  include_feed_header: true       # include feed_header field in candidates
+  print_feed_header: true         # CLI-only (used in pipeline_3_gold_validate)
+  feed_header_keys: ["title", "header", "name", "feed_title"]
+  load_feeds_meta_map_path : https://hyde-cache-pipeline-api-810737581373.asia-southeast1.run.app/cache/get-many
+
+  # --------------------
+  # Exclude-seen policy
+  # --------------------
+  exclude_seen:
+    enabled: true
+    interactions_path: data/interactions.csv
+    event_types: ["view", "click", "like", "share", "comment"]
+    window_days: 100
+    max_unique: 5000
+
+    # USED:
+    # - exclude_seen.enabled → enforced in pipeline_3_online_retrieval
+    # - interactions_path   → loaded during retrieval
+    # - event_types / window_days / max_unique → filtering logic
+    #
+    # NOTE:
+    # - Violations are treated as HARD FAIL in gold validation
+    # - In production, interactions_path will be replaced by a service / DB
+
+
+# --------------------------------------------------------------------------------------
+# Scoring weights (USED in POC)
+# --------------------------------------------------------------------------------------
+scoring:
+  similarity_weight: 0.80
+  freshness_weight: 0.15
+  coverage_weight: 0.05
+  # USED:
+  # - These weights are applied in online_score_aggregation
+  #
+  # NOTE:
+  # - Weights are NOT auto-normalized
+  # - Caller is responsible for sensible values
+  # - coverage_weight is currently a placeholder for future diversity logic
+
+# --------------------------------------------------------------------------------------
+# Error protection
+# --------------------------------------------------------------------------------------
+eprotection:
+  # score
+  num_queries: 5
+  candidate_queries : 50
+  # hq
+  fallback_hq_weights: [1.0, 1.0, 1.0, 0.6, 0.6]
+  fallback_intent_label: "fallback"
+  fallback_query_text: ""

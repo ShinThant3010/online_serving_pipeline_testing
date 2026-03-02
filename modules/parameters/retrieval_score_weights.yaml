@@ -1,0 +1,41 @@
+# parameters/retrieval_score_weights.yaml
+#
+# Purpose
+# -------
+# Deterministic candidate score aggregation config for ONLINE retrieval ranking.
+# Consumed by:
+#   - functions/core/online_score_aggregation.py
+#
+# Backend note
+# ------------
+# - POC retrieval backend is FAISS.
+# - Production retrieval backend will be Vertex AI Vector Search.
+# - This config remains backend-agnostic because it only aggregates subscores
+#   that are already computed by the retrieval pipeline.
+
+score_aggregation:
+  # Master switch: when false, aggregate_candidates() returns candidates unchanged
+  enabled: true
+
+  # Aggregation strategy
+  # Currently supported: "linear"
+  mode: linear
+
+  # Weights for each score component
+  # These will be optionally renormalized to sum to 1.0
+  weights:
+    vector_score: 0.50        # main semantic relevance (HyDE + FAISS)
+    language_match: 0.00      # TH/EN preference alignment
+    recency: 0.25             # time decay from feed metadata
+    popularity: 0.25          # optional global popularity signal
+
+  # Safety & determinism
+  clamp_inputs: true          # clamp all inputs to [0, 1]
+  renormalize: true           # renormalize weights if sum != 1
+  missing_subscore_value: 0.0 # used if a subscore is missing
+
+  # Optional tie-breakers for stable sorting AFTER final_score
+  # (used only when final_score ties)
+  tie_breakers:
+    - vector_score
+    - recency
