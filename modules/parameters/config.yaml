@@ -15,8 +15,8 @@ hyde_data:
   metadata_prefix: metadata
 
 vertex:
-  index_endpoint: "projects/810737581373/locations/asia-southeast1/indexEndpoints/6583602948238999552"
-  deployed_index_id: "feeds_items_deployed"
+  index_endpoint: "projects/810737581373/locations/asia-southeast1/indexEndpoints/8433667601413963776"
+  deployed_index_id: "feeds_5k_deployed"
   neighbor_count: 50
   return_full_datapoint: false
   # restricts_list:
@@ -25,7 +25,7 @@ vertex:
   #     - "university"
 
 bigquery:
-  fallback_table: "poc-piloturl-nonprod.gold_layer.feeds"
+  fallback_table: "poc-piloturl-nonprod.gold_layer.feeds_5k"
   fallback_limit: 50
 
 trigger_hyde_generation:
