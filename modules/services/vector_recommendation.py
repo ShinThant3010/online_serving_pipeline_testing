@@ -44,9 +44,13 @@ def rerank_neighbors(
     feed_matrix: list[list[str]] = []
 
     for neighbors in search_results:
+        if not isinstance(neighbors, list):
+            continue
         row_scores: list[float] = []
         row_feeds: list[str] = []
         for item in neighbors:
+            if not isinstance(item, dict):
+                continue
             feed_id = item.get("feed_id")
             score = item.get("score")
             if not feed_id or score is None:
@@ -65,4 +69,3 @@ def rerank_neighbors(
         feed_matrix=feed_matrix,
         embedding_store=embedding_store,
     )
-

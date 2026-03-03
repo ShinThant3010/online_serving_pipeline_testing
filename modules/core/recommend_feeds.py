@@ -1,3 +1,6 @@
+import time
+from dataclasses import dataclass
+
 from google.cloud import bigquery
 
 from api.schema import FeedsMetadata, FeedsRecommendation, RecommendationResponse
@@ -16,6 +19,15 @@ from modules.services.vector_recommendation import (
 )
 from modules.utils.load_config import Settings
 from modules.utils.redis import RedisCache
+
+
+@dataclass
+class RecommendationDiagnostics:
+    cache_hit: bool
+    t_total: float
+    t_cache_get: float
+    t_vector_search: float
+    t_postprocess: float
 
 
 class RecommendationService:
@@ -60,29 +72,55 @@ class RecommendationService:
         *,
         index_endpoint: str | None = None,
         deployed_index_id: str | None = None,
-    ) -> RecommendationResponse:
+    ) -> tuple[RecommendationResponse, RecommendationDiagnostics]:
         """Get feed recommendations from cache, vector search, or fallback."""
+        started = time.perf_counter()
+        t_cache_get = 0.0
+        t_vector_search = 0.0
+        t_postprocess = 0.0
+        cache_hit = False
+
         active_vector_search = self._resolve_vector_search(
             index_endpoint=index_endpoint,
             deployed_index_id=deployed_index_id,
         )
         cache_key = self._key(student_id)
+        cache_started = time.perf_counter()
         cached_response = self._get_cached_response(cache_key)
+        t_cache_get = time.perf_counter() - cache_started
         
         print(f"Checking cache for {student_id} with key {cache_key}...")
         if cached_response:
-            return cached_response
+            cache_hit = True
+            diagnostics = RecommendationDiagnostics(
+                cache_hit=cache_hit,
+                t_total=time.perf_counter() - started,
+                t_cache_get=t_cache_get,
+                t_vector_search=t_vector_search,
+                t_postprocess=t_postprocess,
+            )
+            return cached_response, diagnostics
 
         print(f"No cache found for {student_id}, retrieving embedding for vector search...")
         embeddings = self.embedding_store.load_embeddings(student_id)
 
         if not embeddings:
             print(f"No embeddings found for {student_id}, activating fallback...")
-            return self._build_fallback_response(student_id=student_id, trigger_refresh=True)
+            postprocess_started = time.perf_counter()
+            response = self._build_fallback_response(student_id=student_id, trigger_refresh=True)
+            t_postprocess = time.perf_counter() - postprocess_started
+            diagnostics = RecommendationDiagnostics(
+                cache_hit=cache_hit,
+                t_total=time.perf_counter() - started,
+                t_cache_get=t_cache_get,
+                t_vector_search=t_vector_search,
+                t_postprocess=t_postprocess,
+            )
+            return response, diagnostics
 
         try:
             print(f"Embeddings retrieved for {student_id}, proceeding with vector search...")
-            response = self._build_vector_response(
+            response, t_vector_search, t_postprocess = self._build_vector_response(
                 student_id=student_id,
                 embeddings=embeddings,
                 vector_search=active_vector_search,
@@ -93,17 +131,44 @@ class RecommendationService:
                     f"Vector recommendations below minimum threshold for {student_id} "
                     f"({len(response.recommendations)}/{minimum_recommendation}); using fallback."
                 )
-                return self._build_fallback_response(student_id=student_id, trigger_refresh=False)
+                postprocess_started = time.perf_counter()
+                response = self._build_fallback_response(student_id=student_id, trigger_refresh=False)
+                t_postprocess = time.perf_counter() - postprocess_started
+                diagnostics = RecommendationDiagnostics(
+                    cache_hit=cache_hit,
+                    t_total=time.perf_counter() - started,
+                    t_cache_get=t_cache_get,
+                    t_vector_search=t_vector_search,
+                    t_postprocess=t_postprocess,
+                )
+                return response, diagnostics
 
             self.redis_cache.set(
                 cache_key,
                 response.model_dump(),
                 ttl_seconds=self.settings.cache.ttl_seconds,
             )
-            return response
+            diagnostics = RecommendationDiagnostics(
+                cache_hit=cache_hit,
+                t_total=time.perf_counter() - started,
+                t_cache_get=t_cache_get,
+                t_vector_search=t_vector_search,
+                t_postprocess=t_postprocess,
+            )
+            return response, diagnostics
         except Exception as exc: 
             print(f"vector search fallback activated for {student_id}: {exc}")
-            return self._build_fallback_response(student_id=student_id, trigger_refresh=False)
+            postprocess_started = time.perf_counter()
+            response = self._build_fallback_response(student_id=student_id, trigger_refresh=False)
+            t_postprocess = time.perf_counter() - postprocess_started
+            diagnostics = RecommendationDiagnostics(
+                cache_hit=cache_hit,
+                t_total=time.perf_counter() - started,
+                t_cache_get=t_cache_get,
+                t_vector_search=t_vector_search,
+                t_postprocess=t_postprocess,
+            )
+            return response, diagnostics
 
     def _get_cached_response(self, cache_key: str) -> RecommendationResponse | None:
         """Attempt to retrieve a cached recommendation response from Redis."""
@@ -121,11 +186,14 @@ class RecommendationService:
         student_id: str,
         embeddings: list[list[float]],
         vector_search: VectorSearchClient,
-    ) -> RecommendationResponse:
+    ) -> tuple[RecommendationResponse, float, float]:
         """Build a recommendation response using vector search results."""
+        search_started = time.perf_counter()
         search_results = search_neighbors_async(embeddings, vector_search=vector_search)
+        t_vector_search = time.perf_counter() - search_started
 
         print(f"Vector search completed for {student_id}, processing results...")
+        postprocess_started = time.perf_counter()
         reranked = rerank_neighbors(
             student_id,
             search_results,
@@ -134,11 +202,13 @@ class RecommendationService:
 
         print(f"Reranking completed for {student_id}, preparing response...")
         recommendations = format_recommendations(reranked, redis_cache=self.redis_cache)
-        return RecommendationResponse(
+        t_postprocess = time.perf_counter() - postprocess_started
+        response = RecommendationResponse(
             student_id=student_id,
             source="vertex_vector_search",
             recommendations=recommendations,
         )
+        return response, t_vector_search, t_postprocess
 
     def _resolve_vector_search(
         self,

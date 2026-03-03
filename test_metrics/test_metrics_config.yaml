@@ -2,8 +2,8 @@ api:
   base: "https://online-serving-feeds-api-testing-810737581373.asia-southeast1.run.app/"
   route: "/recommendations"
 search:
-  endpoint_id: "projects/810737581373/locations/asia-southeast1/indexEndpoints/8433667601413963776"
-  deployed_index_id: "feeds_5k_deployed"
+  endpoint_id: "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
+  deployed_index_id: "feeds_20k_deployed"
 request:
   include_endpoint_fields: false
 evaluation:

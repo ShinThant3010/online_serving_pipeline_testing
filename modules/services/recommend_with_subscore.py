@@ -65,13 +65,19 @@ def format_recommendations(
 
     resolved_metadata_by_feed_id = metadata_by_feed_id
     if resolved_metadata_by_feed_id is None and redis_cache is not None:
-        feed_ids = [str(item["feed_id"]) for item in reranked if item.get("feed_id")]
+        feed_ids = [
+            str(item["feed_id"])
+            for item in reranked
+            if isinstance(item, dict) and item.get("feed_id")
+        ]
         resolved_metadata_by_feed_id = redis_cache.get_many(feed_ids) if feed_ids else {}
     elif resolved_metadata_by_feed_id is None:
         resolved_metadata_by_feed_id = {}
 
     recommendations: list[FeedsRecommendation] = []
     for item in reranked:
+        if not isinstance(item, dict):
+            continue
         feed_id = item.get("feed_id")
         score_value = item.get("final_score")
         if not feed_id or score_value is None:
