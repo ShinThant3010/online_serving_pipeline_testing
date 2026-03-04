@@ -1,5 +1,6 @@
 import time
 from dataclasses import dataclass
+from threading import Lock
 
 from google.cloud import bigquery
 
@@ -55,6 +56,14 @@ class RecommendationService:
             return_full_datapoint=self.settings.vertex.return_full_datapoint,
             restricts_list=self.settings.vertex.restricts_list,
         )
+        self._default_vector_search_key = (
+            self.settings.vertex.index_endpoint,
+            self.settings.vertex.deployed_index_id,
+        )
+        self._vector_search_clients: dict[tuple[str, str], VectorSearchClient] = {
+            self._default_vector_search_key: self.vector_search
+        }
+        self._vector_search_clients_lock = Lock()
 
         self.bigquery_client = bigquery.Client()
         self.trigger_hyde_generation_service = TriggerHydeGenerationService(
@@ -218,13 +227,21 @@ class RecommendationService:
         ):
             return self.vector_search
 
-        return VectorSearchClient(
-            index_endpoint=effective_index_endpoint,
-            deployed_index_id=effective_deployed_index_id,
-            neighbor_count=self.settings.vertex.neighbor_count,
-            return_full_datapoint=self.settings.vertex.return_full_datapoint,
-            restricts_list=self.settings.vertex.restricts_list,
-        )
+        key = (effective_index_endpoint, effective_deployed_index_id)
+        with self._vector_search_clients_lock:
+            cached = self._vector_search_clients.get(key)
+            if cached is not None:
+                return cached
+
+            client = VectorSearchClient(
+                index_endpoint=effective_index_endpoint,
+                deployed_index_id=effective_deployed_index_id,
+                neighbor_count=self.settings.vertex.neighbor_count,
+                return_full_datapoint=self.settings.vertex.return_full_datapoint,
+                restricts_list=self.settings.vertex.restricts_list,
+            )
+            self._vector_search_clients[key] = client
+            return client
 
     def _build_fallback_response(
         self,

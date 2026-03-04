@@ -3,6 +3,7 @@ import os
 import random
 import time
 import uuid
+from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 
@@ -13,6 +14,7 @@ from modules.utils.load_config import load_settings
 app = FastAPI(title="Feeds Recommendation API", version="0.1.0")
 
 
+@lru_cache(maxsize=1)
 def get_recommendation_service() -> RecommendationService:
     settings = load_settings()
     return RecommendationService(settings=settings)
