@@ -15,8 +15,10 @@ hyde_data:
   metadata_prefix: metadata
 
 vertex:
-  index_endpoint: "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
-  deployed_index_id: "feeds_20k_deployed"
+  # index_endpoint: "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
+  # deployed_index_id: "feeds_20k_deployed"
+  index_endpoint: "projects/810737581373/locations/asia-southeast1/indexEndpoints/1270410919104479232"
+  deployed_index_id: "feeds_20k_4replicas_deployed"
   neighbor_count: 50
   return_full_datapoint: false
   # restricts_list:

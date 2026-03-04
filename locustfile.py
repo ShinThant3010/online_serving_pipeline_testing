@@ -4,7 +4,7 @@ import csv
 from pathlib import Path
 
 from locust import HttpUser, between, task
-from locust.exception import CatchResponseError
+from pydantic import BaseModel
 
 
 def _load_student_ids_from_csv(csv_path: Path) -> list[str]:
@@ -25,15 +25,27 @@ def _load_student_ids_from_csv(csv_path: Path) -> list[str]:
 
 STUDENT_IDS = _load_student_ids_from_csv(Path("test_data_prep/prep_students/student_ids.csv"))
 RECOMMEND_PATH = "/recommendations"
-CATCH_RESPONSE_ERROR_MODE = (os.getenv("LOCUST_CATCH_RESPONSE_ERROR_MODE", "mark") or "mark").strip().lower()
+
+# LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
+# LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_deployed"
+
+LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/1270410919104479232"
+LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_4replicas_deployed"
 
 
-def _handle_catch_response_error(exc: CatchResponseError) -> None:
-    if CATCH_RESPONSE_ERROR_MODE == "ignore":
-        return
-    if CATCH_RESPONSE_ERROR_MODE == "raise":
-        raise exc
-    # default: "mark" (response already marked failed)
+class VertexRequest(BaseModel):
+    index_endpoint: str | None = None
+    deployed_index_id: str | None = None
+
+
+def _build_vertex_payload() -> dict[str, str] | None:
+    if not LOCUST_VERTEX_INDEX_ENDPOINT and not LOCUST_VERTEX_DEPLOYED_INDEX_ID:
+        return None
+    vertex = VertexRequest(
+        index_endpoint=LOCUST_VERTEX_INDEX_ENDPOINT or None,
+        deployed_index_id=LOCUST_VERTEX_DEPLOYED_INDEX_ID or None,
+    )
+    return vertex.model_dump(exclude_none=True)
 
 
 class RecommendationUser(HttpUser):
@@ -43,31 +55,23 @@ class RecommendationUser(HttpUser):
     def recommend(self) -> None:
         student_id = random.choice(STUDENT_IDS)
         payload = {"student_id": student_id}
-        try:
-            with self.client.post(
-                RECOMMEND_PATH,
-                json=payload,
-                name="POST /recommendations",
-                catch_response=True,
-            ) as response:
-                if response.status_code != 200:
-                    message = f"status={response.status_code} body={response.text[:200]}"
-                    response.failure(message)
-                    if CATCH_RESPONSE_ERROR_MODE == "raise":
-                        raise CatchResponseError(message)
-                    return
-                try:
-                    data = response.json()
-                except ValueError:
-                    message = "invalid_json_response"
-                    response.failure(message)
-                    if CATCH_RESPONSE_ERROR_MODE == "raise":
-                        raise CatchResponseError(message)
-                    return
-                if not isinstance(data, dict) or "recommendations" not in data:
-                    message = "missing_recommendations_field"
-                    response.failure(message)
-                    if CATCH_RESPONSE_ERROR_MODE == "raise":
-                        raise CatchResponseError(message)
-        except CatchResponseError as exc:
-            _handle_catch_response_error(exc)
+        vertex_payload = _build_vertex_payload()
+        if vertex_payload:
+            payload["vertex"] = vertex_payload
+        with self.client.post(
+            RECOMMEND_PATH,
+            json=payload,
+            name="POST /recommendations",
+            catch_response=True,
+        ) as response:
+            if response.status_code != 200:
+                message = f"status={response.status_code} body={response.text[:200]}"
+                response.failure(message)
+                return
+            try:
+                data = response.json()
+            except ValueError:
+                response.failure("invalid_json_response")
+                return
+            if not isinstance(data, dict) or "recommendations" not in data:
+                response.failure("missing_recommendations_field")
