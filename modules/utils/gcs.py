@@ -17,7 +17,6 @@ def parse_gcs_prefix(prefix: str) -> tuple[str, str]:
     bucket, _, path = remainder.partition("/")
     if not bucket or not path:
         raise ValueError("GCS prefix must include bucket and folder path")
-    print(f"Parsed GCS prefix: bucket={bucket}, path={path}")
     return bucket, path
 
 

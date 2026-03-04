@@ -13,7 +13,6 @@ def query_sql(
     Execute SQL in BigQuery and return rows as dictionaries.
     """
     try:
-        print("Executing BigQuery SQL:")
         bq_client = client or bigquery.Client()
         job_config = None
         if query_parameters:

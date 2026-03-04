@@ -63,7 +63,7 @@ class HydeEmbeddingStore:
                     payload = dict(first)
                     payload["hq"] = hq
                     return payload
-                print(f"Invalid HyDE query format for {student_id}: `hq` exists but has no valid objects.")
+                # print(f"Invalid HyDE query format for {student_id}: `hq` exists but has no valid objects.")
                 return {}
 
             if self._is_query_object(first):
@@ -83,7 +83,7 @@ class HydeEmbeddingStore:
         if hq:
             return {"hq": hq}
 
-        print(f"Invalid HyDE query payload for {student_id}: expected dict/list of query objects.")
+        # print(f"Invalid HyDE query payload for {student_id}: expected dict/list of query objects.")
         return {}
 
     def _normalize_metadata_payload(self, items: list[Any], *, student_id: str) -> dict[str, Any]:
@@ -110,7 +110,7 @@ class HydeEmbeddingStore:
                 return {"interaction": dict_items}
             return {"items": dict_items}
 
-        print(f"Invalid metadata payload for {student_id}: expected dict or list of objects.")
+        # print(f"Invalid metadata payload for {student_id}: expected dict or list of objects.")
         return {}
 
     def load_embeddings(self, student_id: str) -> list[list[float]]:

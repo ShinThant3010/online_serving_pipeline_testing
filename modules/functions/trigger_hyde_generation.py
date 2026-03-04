@@ -18,7 +18,7 @@ class TriggerHydeGenerationService:
     def trigger_hyde_generation(self, *, student_id: str) -> bool:
         """Fire-and-forget HyDE generation request in a background thread."""
         if not self._should_emit_refresh(student_id=student_id):
-            print(f"hyde_generation_request skipped: recent refresh exists for {student_id}")
+            # print(f"hyde_generation_request skipped: recent refresh exists for {student_id}")
             return False
 
         self._start_background_request(student_id=student_id)

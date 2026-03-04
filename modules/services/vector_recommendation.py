@@ -25,7 +25,7 @@ def search_neighbors_async(
         return await asyncio.gather(*tasks)
 
     try:
-        print("Attempting asynchronous vector search...")
+        # print("Attempting asynchronous vector search...")
         return asyncio.run(_run())
 
     except RuntimeError:

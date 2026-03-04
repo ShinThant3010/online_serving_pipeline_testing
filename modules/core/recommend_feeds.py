@@ -23,11 +23,11 @@ from modules.utils.redis import RedisCache
 
 @dataclass
 class RecommendationDiagnostics:
-    cache_hit: bool
-    t_total: float
-    t_cache_get: float
-    t_vector_search: float
-    t_postprocess: float
+    cache_hit: bool         # Whether the recommendation was served from cache
+    t_total: float          # Total time taken to process the recommendation request
+    t_cache_get: float      # Time taken to attempt cache retrieval
+    t_vector_search: float  # Time taken to perform vector search (if cache miss)
+    t_postprocess: float    # Time taken for post-processing steps like reranking and formatting the response
 
 
 class RecommendationService:
@@ -89,8 +89,8 @@ class RecommendationService:
         cached_response = self._get_cached_response(cache_key)
         t_cache_get = time.perf_counter() - cache_started
         
-        print(f"Checking cache for {student_id} with key {cache_key}...")
         if cached_response:
+            print(f"Cache hit for {student_id}, returning cached recommendations.")
             cache_hit = True
             diagnostics = RecommendationDiagnostics(
                 cache_hit=cache_hit,
@@ -105,7 +105,7 @@ class RecommendationService:
         embeddings = self.embedding_store.load_embeddings(student_id)
 
         if not embeddings:
-            print(f"No embeddings found for {student_id}, activating fallback...")
+            print(f"No embeddings found for {student_id}, activating fallback, trigger hyde generation...")
             postprocess_started = time.perf_counter()
             response = self._build_fallback_response(student_id=student_id, trigger_refresh=True)
             t_postprocess = time.perf_counter() - postprocess_started
@@ -127,10 +127,6 @@ class RecommendationService:
             )
             minimum_recommendation = self.settings.recommendation.minimum_recommendation
             if len(response.recommendations) < minimum_recommendation:
-                print(
-                    f"Vector recommendations below minimum threshold for {student_id} "
-                    f"({len(response.recommendations)}/{minimum_recommendation}); using fallback."
-                )
                 postprocess_started = time.perf_counter()
                 response = self._build_fallback_response(student_id=student_id, trigger_refresh=False)
                 t_postprocess = time.perf_counter() - postprocess_started
@@ -155,6 +151,7 @@ class RecommendationService:
                 t_vector_search=t_vector_search,
                 t_postprocess=t_postprocess,
             )
+            print(f"Vector search returned {len(response.recommendations)} recommendations for {student_id}...")
             return response, diagnostics
         except Exception as exc: 
             print(f"vector search fallback activated for {student_id}: {exc}")
@@ -172,9 +169,7 @@ class RecommendationService:
 
     def _get_cached_response(self, cache_key: str) -> RecommendationResponse | None:
         """Attempt to retrieve a cached recommendation response from Redis."""
-        print(f"Attempting to retrieve cached recommendations with key: {cache_key}")
         cached = self.redis_cache.get(cache_key)
-        print(f"Cache retrieval result for key {cache_key}: {'HIT' if cached else 'MISS'}")
         if not cached:
             return None
         payload = {**cached, "source": "redis_cache"}
@@ -192,7 +187,6 @@ class RecommendationService:
         search_results = search_neighbors_async(embeddings, vector_search=vector_search)
         t_vector_search = time.perf_counter() - search_started
 
-        print(f"Vector search completed for {student_id}, processing results...")
         postprocess_started = time.perf_counter()
         reranked = rerank_neighbors(
             student_id,
@@ -200,7 +194,6 @@ class RecommendationService:
             embedding_store=self.embedding_store,
         )
 
-        print(f"Reranking completed for {student_id}, preparing response...")
         recommendations = format_recommendations(reranked, redis_cache=self.redis_cache)
         t_postprocess = time.perf_counter() - postprocess_started
         response = RecommendationResponse(
@@ -279,13 +272,11 @@ class RecommendationService:
         )
 
         if reranked:
-            print(f"Subscore reranking completed for {student_id}, preparing response with metadata...")
             recommendations = format_recommendations(
                 reranked,
                 metadata_by_feed_id=metadata_by_feed_id,
             )
         else:
-            print(f"No candidates to rerank for {student_id}, preparing fallback response without reranking...")
             recommendations = [
                 FeedsRecommendation(
                     feed_id=feed_id,
