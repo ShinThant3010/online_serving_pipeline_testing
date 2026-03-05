@@ -99,7 +99,7 @@ class RecommendationService:
         t_cache_get = time.perf_counter() - cache_started
         
         if cached_response:
-            print(f"Cache hit for {student_id}, returning cached recommendations.")
+            # print(f"Cache hit for {student_id}, returning cached recommendations.")
             cache_hit = True
             diagnostics = RecommendationDiagnostics(
                 cache_hit=cache_hit,
@@ -110,11 +110,11 @@ class RecommendationService:
             )
             return cached_response, diagnostics
 
-        print(f"No cache found for {student_id}, retrieving embedding for vector search...")
+        # print(f"No cache found for {student_id}, retrieving embedding for vector search...")
         embeddings = self.embedding_store.load_embeddings(student_id)
 
         if not embeddings:
-            print(f"No embeddings found for {student_id}, activating fallback, trigger hyde generation...")
+            # print(f"No embeddings found for {student_id}, activating fallback, trigger hyde generation...")
             postprocess_started = time.perf_counter()
             response = self._build_fallback_response(student_id=student_id, trigger_refresh=True)
             t_postprocess = time.perf_counter() - postprocess_started
@@ -128,7 +128,7 @@ class RecommendationService:
             return response, diagnostics
 
         try:
-            print(f"Embeddings retrieved for {student_id}, proceeding with vector search...")
+            # print(f"Embeddings retrieved for {student_id}, proceeding with vector search...")
             response, t_vector_search, t_postprocess = self._build_vector_response(
                 student_id=student_id,
                 embeddings=embeddings,
@@ -160,10 +160,10 @@ class RecommendationService:
                 t_vector_search=t_vector_search,
                 t_postprocess=t_postprocess,
             )
-            print(f"Vector search returned {len(response.recommendations)} recommendations for {student_id}...")
+            # print(f"Vector search returned {len(response.recommendations)} recommendations for {student_id}...")
             return response, diagnostics
         except Exception as exc: 
-            print(f"vector search fallback activated for {student_id}: {exc}")
+            # print(f"vector search fallback activated for {student_id}: {exc}")
             postprocess_started = time.perf_counter()
             response = self._build_fallback_response(student_id=student_id, trigger_refresh=False)
             t_postprocess = time.perf_counter() - postprocess_started
@@ -267,12 +267,12 @@ class RecommendationService:
                 metadata = FeedsMetadata(**payload) if isinstance(payload, dict) else None
                 fallback_items.append((feed_id, metadata))
             fallback_source = "redis_fallback"
-            print(f"Using Redis fallback with {len(fallback_items)} cached feeds.")
+            # print(f"Using Redis fallback with {len(fallback_items)} cached feeds.")
         else:
-            print(
-                "Redis fallback cache is insufficient "
-                f"({len(feed_cache_keys)}/{fallback_limit}); using BigQuery fallback."
-            )
+            # print(
+            #     "Redis fallback cache is insufficient "
+            #     f"({len(feed_cache_keys)}/{fallback_limit}); using BigQuery fallback."
+            # )
             fallback_items = fetch_fallback_recommendations(
                 bigquery_client=self.bigquery_client,
                 fallback_table=self.settings.bigquery.fallback_table,

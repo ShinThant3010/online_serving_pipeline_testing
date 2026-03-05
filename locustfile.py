@@ -26,8 +26,10 @@ def _load_student_ids_from_csv(csv_path: Path) -> list[str]:
 STUDENT_IDS = _load_student_ids_from_csv(Path("test_data_prep/prep_students/student_ids.csv"))
 RECOMMEND_PATH = "/recommendations"
 
-LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
-LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_deployed"
+# LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
+# LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_deployed"
+LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/6458557689835290624"
+LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_4replicas_deployed"
 
 
 class VertexRequest(BaseModel):
@@ -68,7 +70,19 @@ class RecommendationUser(HttpUser):
             try:
                 data = response.json()
             except ValueError:
+                print(
+                    "DEBUG validation_fail invalid_json "
+                    f"status={response.status_code} "
+                    f"content_type={response.headers.get('content-type')} "
+                    f"body={response.text[:300]}"
+                )
                 response.failure("invalid_json_response")
                 return
             if not isinstance(data, dict) or "recommendations" not in data:
+                print(
+                    "DEBUG validation_fail missing_recommendations "
+                    f"status={response.status_code} "
+                    f"content_type={response.headers.get('content-type')} "
+                    f"body={response.text[:300]}"
+                )
                 response.failure("missing_recommendations_field")

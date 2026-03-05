@@ -82,7 +82,7 @@ def recommend(
     trace_id = _extract_trace_id(request)
     instance_id = _instance_id()
     try:
-        print(f"Received recommendation request for student_id: {payload.student_id}")
+        # print(f"Received recommendation request for student_id: {payload.student_id}")
         response, diagnostics = service.recommend(
             payload.student_id,
             index_endpoint=payload.vertex.index_endpoint if payload.vertex else None,

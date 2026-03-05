@@ -142,8 +142,8 @@ class HydeEmbeddingStore:
                     continue
                 vectors.append(vector)
 
-        if not vectors:
-            print(f"No valid embeddings found for {student_id}.")
+        # if not vectors:
+            # print(f"No valid embeddings found for {student_id}.")
         return vectors
 
     def load_hyde_queries(self, student_id: str) -> dict[str, Any]:

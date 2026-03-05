@@ -29,7 +29,7 @@ def search_neighbors_async(
         return asyncio.run(_run())
 
     except RuntimeError:
-        print("Async vector search failed, falling back to synchronous search.")
+        # print("Async vector search failed, falling back to synchronous search.")
         return [vector_search.search([embedding]) for embedding in embeddings if embedding]
 
 

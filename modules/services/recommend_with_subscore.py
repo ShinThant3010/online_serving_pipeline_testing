@@ -20,7 +20,7 @@ def rerank_with_subscore(
         embedding_store=embedding_store,
     )
     if not hyde_query or not score_matrix or not feed_matrix:
-        print(f"No hyde_query nor vector search score found for {student_id}, reranking with metadata only.")
+        # print(f"No hyde_query nor vector search score found for {student_id}, reranking with metadata only.")
         # _save_calc_subscore_params(
         #     student_id=student_id,
         #     params={

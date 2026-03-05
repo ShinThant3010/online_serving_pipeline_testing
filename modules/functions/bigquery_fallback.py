@@ -56,5 +56,5 @@ def fetch_fallback_recommendations(
         metadata = FeedsMetadata(**metadata_dict) if metadata_dict else None
         items.append((feed_id, metadata))
 
-    print(f"Fetched {len(items)} fallback recommendations from `{fallback_table}`.")
+    # print(f"Fetched {len(items)} fallback recommendations from `{fallback_table}`.")
     return items
