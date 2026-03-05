@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 class AppConfig:
     host: str
     port: int
+    perf_log_sample_rate: float
 
 
 @dataclass(frozen=True)
@@ -130,6 +131,7 @@ def load_settings(config_path: str = "modules/parameters/config.yaml") -> Settin
         app=AppConfig(
             host=str(app_cfg.get("host", "0.0.0.0")),
             port=_to_int(app_cfg.get("port"), 8080),
+            perf_log_sample_rate=_to_float(app_cfg.get("perf_log_sample_rate"), 1.0),
         ),
         cache=CacheConfig(
             redis_host=str(os.getenv("REDISHOST", cache_cfg.get("redis_host", "localhost"))),

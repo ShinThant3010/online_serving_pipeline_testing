@@ -1,6 +1,7 @@
 app:
   host: 0.0.0.0
   port: 8080
+  perf_log_sample_rate: 1.0
 
 cache:
   redis_host: 10.86.221.99

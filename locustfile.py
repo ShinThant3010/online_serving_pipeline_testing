@@ -26,10 +26,10 @@ def _load_student_ids_from_csv(csv_path: Path) -> list[str]:
 STUDENT_IDS = _load_student_ids_from_csv(Path("test_data_prep/prep_students/student_ids.csv"))
 RECOMMEND_PATH = "/recommendations"
 
-# LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
-# LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_deployed"
-LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/6458557689835290624"
-LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_4replicas_deployed"
+LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
+LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_deployed"
+# LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/6458557689835290624"
+# LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_4replicas_deployed"
 
 
 class VertexRequest(BaseModel):

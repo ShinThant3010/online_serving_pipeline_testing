@@ -7,6 +7,10 @@ from redis.exceptions import TimeoutError as RedisTimeoutError
 
 
 class RedisCache:
+
+# ---------------------------------------------------------------------------------------------
+# Initialization Redis client with connection parameters and timeouts
+# ---------------------------------------------------------------------------------------------
     def __init__(
         self,
         host: str,
@@ -23,6 +27,10 @@ class RedisCache:
             socket_timeout=timeout_seconds,
         )
 
+
+# ---------------------------------------------------------------------------------------------
+# Public methods for getting and setting cache values, with error handling and logging
+# ---------------------------------------------------------------------------------------------
     @staticmethod
     def _load_json(payload: str) -> dict[str, Any] | None:
         try:
@@ -31,7 +39,8 @@ class RedisCache:
         except json.JSONDecodeError:
             return None
 
-    def get(self, key: str) -> dict[str, Any] | None:
+
+    def get_one(self, key: str) -> dict[str, Any] | None:
         """
         Retrieves a value from Redis by key. Returns None if the key does not exist or if there is a connection error.
         """
@@ -43,6 +52,7 @@ class RedisCache:
         except (RedisConnectionError, RedisTimeoutError) as exc:
             print(f"Warning: Redis get failed for key '{key}': {exc}")
             return None
+
 
     def get_many(self, keys: list[str]) -> dict[str, dict[str, Any] | None]:
         """
@@ -62,7 +72,8 @@ class RedisCache:
             print(f"Warning: Redis get_many failed: {exc}")
             return {}
 
-    def set(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None:
+
+    def set_one(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None:
         """
         Sets a value in Redis with a time-to-live (TTL). Logs a warning if there is a connection error.
         """
@@ -70,6 +81,7 @@ class RedisCache:
             self.redis_client.setex(key, ttl_seconds, json.dumps(value))
         except (RedisConnectionError, RedisTimeoutError) as exc:
             print(f"Warning: Redis set failed for key '{key}': {exc}")
+
 
     def set_many(self, mapping: dict[str, dict[str, Any]], ttl_seconds: int) -> int:
         """
@@ -89,7 +101,8 @@ class RedisCache:
             print(f"Warning: Redis set_many failed: {exc}")
             return 0
 
-    def get_cached_ids(self, cache_prefix: str) -> list[str]:
+
+    def get_many_by_prefix(self, cache_prefix: str) -> list[str]:
         """
         Retrieves and returns sorted cache keys that match the given prefix.
         """
@@ -97,5 +110,19 @@ class RedisCache:
         try:
             return sorted(str(key) for key in self.redis_client.scan_iter(match=pattern))
         except (RedisConnectionError, RedisTimeoutError) as exc:
-            print(f"Warning: Redis get_cached_ids failed for prefix '{cache_prefix}': {exc}")
+            print(f"Warning: Redis get_many_by_prefix failed for prefix '{cache_prefix}': {exc}")
             return []
+
+# ---------------------------------------------------------------------------------------------
+# There are more functions reusable in main cache-redis pipeline
+# set-one 
+# set-many
+# set-many-bigquery
+# get-one/{item-id}
+# get-many 
+# get-many-by-prefix
+# delete-one/{item-id}
+# delete-prefix
+# clear-all
+# memory-usage
+# ---------------------------------------------------------------------------------------------

@@ -28,7 +28,7 @@ class HydeEmbeddingStore:
             return None
 
         # Some .npy payloads are a 2D matrix in one object: [[...], [...]].
-        if item and all(isinstance(row, list) for row in item):
+        if all(isinstance(row, list) for row in item):
             return None
 
         try:
@@ -36,57 +36,31 @@ class HydeEmbeddingStore:
         except (TypeError, ValueError):
             return None
 
-        if not vector or not any(value != 0.0 for value in vector):
-            return None
-        return vector
+        return vector if any(value != 0.0 for value in vector) else None
 
-    @staticmethod
-    def _is_query_object(item: Any) -> bool:
-        if not isinstance(item, dict):
-            return False
-        # Accept query objects with any common query field.
-        return any(key in item for key in ("query_id", "query_text", "weight", "intent_label"))
-
-    def _normalize_hyde_query_payload(self, items: list[Any], *, student_id: str) -> dict[str, Any]:
+    def _normalize_hyde_query_payload(self, items: list[Any]) -> dict[str, Any]:
         """
-        Normalize loaded query payload to {'hq': [query_dict, ...]} when possible.
-        Returns {} for unsupported structures.
+        Normalize query payload to {'hq': [query_dict, ...]} using basic structure checks.
+        Supported input shapes:
+        - first item is {'hq': [dict, ...]}
+        - first item is [dict, ...]
+        - items is [dict, ...]
         """
         if not items:
             return {}
 
         first = items[0]
         if isinstance(first, dict):
-            if isinstance(first.get("hq"), list):
-                hq = [q for q in first["hq"] if isinstance(q, dict)]
-                if hq:
-                    payload = dict(first)
-                    payload["hq"] = hq
-                    return payload
-                # print(f"Invalid HyDE query format for {student_id}: `hq` exists but has no valid objects.")
+            if not isinstance(first.get("hq"), list):
                 return {}
+            hq = [q for q in first["hq"] if isinstance(q, dict)]
+            return {**first, "hq": hq} if hq else {}
 
-            if self._is_query_object(first):
-                return {"hq": [first]}
+        source = first if isinstance(first, list) else items
+        hq = [q for q in source if isinstance(q, dict)]
+        return {"hq": hq} if hq else {}
 
-            if isinstance(first.get("items"), list):
-                hq = [q for q in first["items"] if isinstance(q, dict)]
-                if hq:
-                    return {"hq": hq}
-
-        if isinstance(first, list):
-            hq = [q for q in first if isinstance(q, dict)]
-            if hq:
-                return {"hq": hq}
-
-        hq = [q for q in items if isinstance(q, dict)]
-        if hq:
-            return {"hq": hq}
-
-        # print(f"Invalid HyDE query payload for {student_id}: expected dict/list of query objects.")
-        return {}
-
-    def _normalize_metadata_payload(self, items: list[Any], *, student_id: str) -> dict[str, Any]:
+    def _normalize_metadata_payload(self, items: list[Any]) -> dict[str, Any]:
         """
         Normalize loaded metadata payload to a dict.
         Returns {} for unsupported structures.
@@ -99,19 +73,19 @@ class HydeEmbeddingStore:
             return first
 
         if isinstance(first, list):
-            interactions = [row for row in first if isinstance(row, dict)]
-            if interactions:
-                return {"interaction": interactions}
+            dict_rows = [row for row in first if isinstance(row, dict)]
+            return {"interaction": dict_rows} if dict_rows else {}
 
         dict_items = [row for row in items if isinstance(row, dict)]
-        if dict_items:
-            # If multiple dict records look like interaction rows, expose them under "interaction".
-            if all(any(k in row for k in ("student_id", "user_id", "feed_id", "event_type")) for row in dict_items):
-                return {"interaction": dict_items}
-            return {"items": dict_items}
+        if not dict_items:
+            return {}
 
-        # print(f"Invalid metadata payload for {student_id}: expected dict or list of objects.")
-        return {}
+        # If multiple dict records look like interaction rows, expose them under "interaction".
+        is_interaction_rows = all(
+            any(key in row for key in ("student_id", "user_id", "feed_id", "event_type"))
+            for row in dict_items
+        )
+        return {"interaction": dict_items} if is_interaction_rows else {"items": dict_items}
 
     def load_embeddings(self, student_id: str) -> list[list[float]]:
         """
@@ -131,16 +105,10 @@ class HydeEmbeddingStore:
 
         vectors: list[list[float]] = []
         for item in items:
-            if isinstance(item, list) and item and all(isinstance(row, list) for row in item):
-                candidates = item
-            else:
-                candidates = [item]
-
+            candidates = item if isinstance(item, list) and item and all(isinstance(row, list) for row in item) else [item]
             for candidate in candidates:
-                vector = self._to_valid_vector(candidate)
-                if vector is None:
-                    continue
-                vectors.append(vector)
+                if (vector := self._to_valid_vector(candidate)) is not None:
+                    vectors.append(vector)
 
         # if not vectors:
             # print(f"No valid embeddings found for {student_id}.")
@@ -155,7 +123,7 @@ class HydeEmbeddingStore:
 
         gcs_prefix = self._build_gcs_prefix(student_id, self.query_prefix)
         items = load_data_from_gcs_prefix(gcs_prefix, file_type="json")
-        return self._normalize_hyde_query_payload(items, student_id=student_id)
+        return self._normalize_hyde_query_payload(items)
 
     def load_metadata(self, student_id: str) -> dict[str, Any]:
         """
@@ -166,4 +134,4 @@ class HydeEmbeddingStore:
 
         gcs_prefix = self._build_gcs_prefix(student_id, self.metadata_prefix)
         items = load_data_from_gcs_prefix(gcs_prefix, file_type="json")
-        return self._normalize_metadata_payload(items, student_id=student_id)
+        return self._normalize_metadata_payload(items)
