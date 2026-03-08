@@ -155,19 +155,30 @@ curl -X POST http://localhost:8080/recommendations \
   -d '{"student_id":"student_123"}'
 ```
 
-## 8. Run with Docker
+## 8. Build and Deploy to Cloud Run (Cloud Build)
 
-Build image:
+This repo includes `cloudbuild.yaml` that performs:
+1. Docker build
+2. Docker push to Artifact Registry
+3. Deploy to Cloud Run
+
+Default substitutions in `cloudbuild.yaml`:
+- `_REGION=asia-southeast1`
+- `_REPO_NAME=online-serving-feeds-api`
+- `_VPC_CONNECTOR_NAME=redis-test-connector`
+- `_SA_NAME=test-result-data-api-sa`
+- `_REDIS_HOST=10.86.221.99`
+- `_REDIS_PORT=6379`
+
+Run deployment with defaults:
 ```bash
-docker build -t online-serving-pipeline .
+gcloud builds submit --config cloudbuild.yaml
 ```
 
-Run container:
+Override substitutions for another environment:
 ```bash
-docker run --rm -p 8080:8080 \
-  -e REDISHOST=<redis-host> \
-  -e REDISPORT=6379 \
-  online-serving-pipeline
+gcloud builds submit --config cloudbuild.yaml \
+  --substitutions=_REGION=asia-southeast1,_REPO_NAME=<service-name>,_VPC_CONNECTOR_NAME=<vpc-connector>,_SA_NAME=<service-account-name>,_REDIS_HOST=<redis-host>,_REDIS_PORT=6379
 ```
 
 ## 9. Load Testing (Locust)
@@ -231,10 +242,4 @@ Output CSV path is configured in `output.csv` in the metrics config.
 - Vertex endpoint/index misconfigured:
   - Runtime fallback to Redis/BigQuery recommendations.
 - BigQuery fallback table missing or schema invalid:
-  - Raises runtime error (must include `feed_id` column).
-
-## 13. Notes for New Developers
-
-- Existing `README.md` was empty; this file is the operational guide.
-- There are currently no unit tests in this repository.
-- Primary behavior lives in `modules/core/recommend_feeds.py`; start there when debugging recommendation logic.
+  - Raises runtime error (table must include `feed_id` column).
