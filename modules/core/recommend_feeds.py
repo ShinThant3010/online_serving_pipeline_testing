@@ -172,7 +172,7 @@ class RecommendationService:
             ### ------------------------- return vector search response ------------------------- ###
 
         except Exception as exc: 
-            # print(f"vector search fallback activated for {student_id}: {exc}")
+            print(f"vector search fallback activated for {student_id}: {exc}")
             postprocess_started = time.perf_counter()
             response = self._build_fallback_response(student_id=student_id, trigger_refresh=False)
             t_postprocess = time.perf_counter() - postprocess_started
@@ -209,10 +209,13 @@ class RecommendationService:
         embeddings: list[list[float]],
     ) -> tuple[RecommendationResponse, float, float]:
         """Build a recommendation response using vector search results."""
+
+        ### ------------------------------------ async vector search ------------------------------------ ###
         search_started = time.perf_counter()
         search_results = search_neighbors_async(embeddings, vector_search=self.vector_search)
         t_vector_search = time.perf_counter() - search_started
 
+        ### ---- Adjust vector search result format to subscore format & call subscore calc function ----- ###
         postprocess_started = time.perf_counter()
         reranked = rerank_neighbors(
             student_id,
@@ -220,7 +223,27 @@ class RecommendationService:
             embedding_store=self.embedding_store,
         )
 
-        recommendations = format_recommendations(reranked, redis_cache=self.redis_cache)
+        ### -------------------------------------- prep metadata --------------------------------------- ###
+        feed_ids = [
+            str(item["feed_id"])
+            for item in reranked
+            if isinstance(item, dict) and item.get("feed_id")
+        ]
+        if feed_ids:
+            redis_keys = [f"feeds:{feed_id}" for feed_id in feed_ids]
+            cached_by_redis_key = self.redis_cache.get_many(redis_keys)
+            resolved_metadata_by_feed_id = {
+                feed_id: cached_by_redis_key.get(f"feeds:{feed_id}") for feed_id in feed_ids
+            }
+        else:
+            resolved_metadata_by_feed_id = {}
+
+
+        ### -------------- Convert reranked items to feed recommendations (final response) -------------- ###
+        recommendations = format_recommendations(
+            reranked,
+            metadata_by_feed_id=resolved_metadata_by_feed_id,
+        )
         t_postprocess = time.perf_counter() - postprocess_started
         response = RecommendationResponse(
             student_id=student_id,
@@ -240,6 +263,8 @@ class RecommendationService:
         trigger_refresh: bool,
     ) -> RecommendationResponse:
         """Build a recommendation response using fallback data, optionally triggering a refresh of the HyDE generation."""
+
+        ### --------------------- trigger hyDE api call for no embeddings fallback --------------------- ###
         if trigger_refresh:
             self.trigger_hyde_generation_service.trigger_hyde_generation(student_id=student_id)
 
@@ -247,6 +272,7 @@ class RecommendationService:
         fallback_source = "bigquery_fallback"
         feed_cache_keys = self.redis_cache.get_many_by_prefix("feeds")
 
+        ### ----------------------- if there is metadata in cache, cache fallback ----------------------- ###
         if len(feed_cache_keys) >= fallback_limit:
             selected_keys = feed_cache_keys[:fallback_limit]
             cached_payloads = self.redis_cache.get_many(selected_keys)
@@ -258,6 +284,8 @@ class RecommendationService:
                 fallback_items.append((feed_id, metadata))
             fallback_source = "redis_fallback"
             # print(f"Using Redis fallback with {len(fallback_items)} cached feeds.")
+
+        ### ------------------------ if no metadata in cache, bigquery fallback ------------------------ ###
         else:
             # print(f"Redis fallback cache is insufficient ({len(feed_cache_keys)}/{fallback_limit}); using BigQuery fallback.")
             fallback_items = fetch_fallback_recommendations(
@@ -269,12 +297,14 @@ class RecommendationService:
         metadata_by_feed_id = {feed_id: metadata for feed_id, metadata in fallback_items}
         feed_ids = [feed_id for feed_id, _ in fallback_items]
 
+        ### ------------------- prep for subscore calc & call subscore calc function ------------------- ###
         reranked = rerank_with_subscore(
             student_id=student_id,
             feed_matrix=[feed_ids] if feed_ids else [],
             embedding_store=self.embedding_store,
         )
 
+        ### -------------- Convert reranked items to feed recommendations (final response) -------------- ###
         if reranked:
             recommendations = format_recommendations(
                 reranked,

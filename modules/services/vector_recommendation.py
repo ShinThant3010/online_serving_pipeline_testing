@@ -7,6 +7,9 @@ from modules.services.recommend_with_subscore import rerank_with_subscore
 from modules.functions.vector_search import VectorSearchClient
 
 
+# ---------------------------------------------------------------------------------------------
+# perform async vector_search () for all embeddings; if async fails, do synchronous search
+# ---------------------------------------------------------------------------------------------
 def search_neighbors_async(
     embeddings: list[list[float]],
     *,
@@ -33,6 +36,9 @@ def search_neighbors_async(
         return [vector_search.search([embedding]) for embedding in embeddings if embedding]
 
 
+# ---------------------------------------------------------------------------------------------
+# Adjust vector search result format to subscore format & call subscore calc function
+# ---------------------------------------------------------------------------------------------
 def rerank_neighbors(
     student_id: str,
     search_results: list[list[dict[str, Any]]],
@@ -43,6 +49,7 @@ def rerank_neighbors(
     score_matrix: list[list[float]] = []
     feed_matrix: list[list[str]] = []
 
+    ### ----------------- prep vector search result for subscore calc ----------------- ###
     for neighbors in search_results:
         if not isinstance(neighbors, list):
             continue
@@ -63,6 +70,7 @@ def rerank_neighbors(
         score_matrix.append(row_scores)
         feed_matrix.append(row_feeds)
 
+    ### ---- call subscore calc function with helper to load hyde query & metadata ---- ###
     return rerank_with_subscore(
         student_id=student_id,
         score_matrix=score_matrix,

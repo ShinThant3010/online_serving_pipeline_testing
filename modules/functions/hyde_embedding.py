@@ -61,27 +61,26 @@ class HydeEmbeddingStore:
 
     ### --------------------------- Validate loaded hyde query --------------------------- ###
     @staticmethod
-    def _to_valid_hyde_query_payload(items: list[Any]) -> dict[str, Any]:
+    def _to_valid_hyde_query_payload(items: list[Any]) -> list[dict[str, Any]]:
         """
-        Normalize query payload to {'hq': [query_dict, ...]} using basic structure checks.
+        Normalize query payload to a list of query dicts using basic structure checks.
         Supported input shapes:
         - first item is {'hq': [dict, ...]}
         - first item is [dict, ...]
         - items is [dict, ...]
         """
         if not items:
-            return {}
+            return []
 
         first = items[0]
         if isinstance(first, dict):
-            if not isinstance(first.get("hq"), list):
-                return {}
-            hq = [q for q in first["hq"] if isinstance(q, dict)]
-            return {**first, "hq": hq} if hq else {}
+            hq = first.get("hq")
+            if not isinstance(hq, list):
+                return []
+            return [q for q in hq if isinstance(q, dict)]
 
         source = first if isinstance(first, list) else items
-        hq = [q for q in source if isinstance(q, dict)]
-        return {"hq": hq} if hq else {}
+        return [q for q in source if isinstance(q, dict)]
 
     ### ---------------------------- Validate loaded metadata ---------------------------- ###
     @staticmethod
@@ -126,12 +125,12 @@ class HydeEmbeddingStore:
 # ---------------------------------------------------------------------------------------------
 # Load hyDE query from hyde-data-lake
 # ---------------------------------------------------------------------------------------------
-    def load_hyde_queries(self, student_id: str) -> dict[str, Any]:
+    def load_hyde_queries(self, student_id: str) -> list[dict[str, Any]]:
         """
-        Load and validate HyDE query payload for a given student ID from GCS.
+        Load and validate HyDE query rows for a given student ID from GCS.
         """
         if not self.bucket or not student_id or not self.query_prefix:
-            return {}
+            return []
 
         gcs_prefix = self._build_gcs_prefix(student_id, self.query_prefix)
         items = load_data_from_gcs_prefix(gcs_prefix, file_type="json")
