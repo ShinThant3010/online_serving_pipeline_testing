@@ -7,12 +7,14 @@ import yaml
 from dotenv import load_dotenv
 
 
+# ---------------------------------------------------------------------------------------------
+# Declare data classes
+# ---------------------------------------------------------------------------------------------
 @dataclass(frozen=True)
 class AppConfig:
     host: str
     port: int
     perf_log_sample_rate: float
-
 
 @dataclass(frozen=True)
 class CacheConfig:
@@ -21,14 +23,12 @@ class CacheConfig:
     ttl_seconds: int
     redis_timeout_seconds: float
 
-
 @dataclass(frozen=True)
 class HydeDataConfig:
     bucket: str
     embedding_prefix: str
     query_prefix: str
     metadata_prefix: str
-
 
 @dataclass(frozen=True)
 class VertexConfig:
@@ -38,12 +38,10 @@ class VertexConfig:
     return_full_datapoint: bool
     restricts_list: dict[str, Any]
 
-
 @dataclass(frozen=True)
 class BigQueryConfig:
     fallback_table: str
     fallback_limit: int
-
 
 @dataclass(frozen=True)
 class TriggerHydeGenerationConfig:
@@ -52,11 +50,9 @@ class TriggerHydeGenerationConfig:
     recommendation_api_base_url: str
     recommendation_path: str
 
-
 @dataclass(frozen=True)
 class RecommendationConfig:
     minimum_recommendation: int
-
 
 @dataclass(frozen=True)
 class Settings:
@@ -69,6 +65,9 @@ class Settings:
     recommendation: RecommendationConfig
 
 
+# ---------------------------------------------------------------------------------------------
+# Helper functions for validation
+# ---------------------------------------------------------------------------------------------
 def _read_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -115,6 +114,9 @@ def _section(payload: dict[str, Any], key: str) -> dict[str, Any]:
     return section if isinstance(section, dict) else {}
 
 
+# ---------------------------------------------------------------------------------------------
+# Main function: load settings 
+# ---------------------------------------------------------------------------------------------
 def load_settings(config_path: str = "modules/parameters/config.yaml") -> Settings:
     load_dotenv()
     cfg = _read_yaml(Path(config_path))

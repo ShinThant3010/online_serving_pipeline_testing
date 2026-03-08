@@ -3,6 +3,9 @@ from google.cloud import bigquery
 from typing import Any
 
 
+# ---------------------------------------------------------------------------------------------
+# load data of the given sql from bigQuery 
+# ---------------------------------------------------------------------------------------------
 def query_sql(
     query: str,
     *,

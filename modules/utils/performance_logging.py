@@ -5,6 +5,7 @@ import uuid
 from fastapi import Request
 
 
+### ----------------------- get "X-Request-Id"/"X-Correlation-Id" ----------------------- ###
 def request_id(request: Request) -> str:
     for header in ("X-Request-Id", "X-Correlation-Id"):
         value = (request.headers.get(header) or "").strip()
@@ -12,19 +13,22 @@ def request_id(request: Request) -> str:
             return value
     return uuid.uuid4().hex
 
-
+### ---------------------------- get "X-Cloud-Trace-Context" ---------------------------- ###
 def extract_trace_id(request: Request) -> str | None:
     trace_context = request.headers.get("X-Cloud-Trace-Context", "").strip()
     if not trace_context:
         return None
     return trace_context.split("/", 1)[0] or None
 
-
+### ------------------------------- control log/ not log ------------------------------- ###
 def should_log_request(sample_rate: float) -> bool:
     sample_rate = min(1.0, max(0.0, sample_rate))
     return random.random() <= sample_rate
 
 
+# ---------------------------------------------------------------------------------------------
+# Main function: logging 
+# ---------------------------------------------------------------------------------------------
 def emit_recommendation_timing_log(
     request: Request,
     sample_rate: float,

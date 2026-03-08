@@ -39,7 +39,7 @@ class RedisCache:
         except json.JSONDecodeError:
             return None
 
-
+    ### ---------------------------------- get one item ---------------------------------- ###
     def get_one(self, key: str) -> dict[str, Any] | None:
         """
         Retrieves a value from Redis by key. Returns None if the key does not exist or if there is a connection error.
@@ -53,7 +53,7 @@ class RedisCache:
             print(f"Warning: Redis get failed for key '{key}': {exc}")
             return None
 
-
+    ### ---------------------------------- get many items ---------------------------------- ###
     def get_many(self, keys: list[str]) -> dict[str, dict[str, Any] | None]:
         """
         Retrieves multiple values from Redis by a list of keys. 
@@ -72,7 +72,7 @@ class RedisCache:
             print(f"Warning: Redis get_many failed: {exc}")
             return {}
 
-
+    ### ---------------------------------- set one item ---------------------------------- ###
     def set_one(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None:
         """
         Sets a value in Redis with a time-to-live (TTL). Logs a warning if there is a connection error.
@@ -82,7 +82,7 @@ class RedisCache:
         except (RedisConnectionError, RedisTimeoutError) as exc:
             print(f"Warning: Redis set failed for key '{key}': {exc}")
 
-
+    ### ---------------------------------- set many items ---------------------------------- ###
     def set_many(self, mapping: dict[str, dict[str, Any]], ttl_seconds: int) -> int:
         """
         Sets multiple key-value pairs in Redis with a time-to-live (TTL). 
@@ -101,7 +101,7 @@ class RedisCache:
             print(f"Warning: Redis set_many failed: {exc}")
             return 0
 
-
+    ### --------------------- get many items those have specific prefix --------------------- ###
     def get_many_by_prefix(self, cache_prefix: str) -> list[str]:
         """
         Retrieves and returns sorted cache keys that match the given prefix.

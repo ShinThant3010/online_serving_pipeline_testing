@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from api.schema import RecommendationRequest, RecommendationResponse
 from modules.core.recommend_feeds import RecommendationService
 from modules.utils.load_config import load_settings
-from modules.utils.log_request import (
+from modules.utils.performance_logging import (
     emit_recommendation_timing_log,
     extract_trace_id,
     request_id,

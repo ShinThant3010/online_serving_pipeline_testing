@@ -7,6 +7,9 @@ import numpy as np
 from google.cloud import storage
 
 
+# ---------------------------------------------------------------------------------------------
+# Helper function - validate gcs path
+# ---------------------------------------------------------------------------------------------
 def parse_gcs_prefix(prefix: str) -> tuple[str, str]:
     """
     Parse a GCS prefix into bucket and path.
@@ -20,6 +23,9 @@ def parse_gcs_prefix(prefix: str) -> tuple[str, str]:
     return bucket, path
 
 
+# ---------------------------------------------------------------------------------------------
+# write data to gcs
+# ---------------------------------------------------------------------------------------------
 def write_to_gcs(
     gcs_prefix: str,
     items: list[dict[str, Any]],
@@ -30,6 +36,14 @@ def write_to_gcs(
     """
     Write items to GCS as a single file.
     """
+
+    ### ------------------------- format datatime data to str ------------------------- ###
+    def _json_default(value: Any) -> Any:
+        if isinstance(value, (datetime, date, time)):
+            return value.isoformat()
+        return str(value)
+
+    ### ------------------------ prep target folder path & data ------------------------ ###
     bucket_name, path = parse_gcs_prefix(gcs_prefix)
 
     clean_filename = filename.strip() or "part-00000"
@@ -40,6 +54,7 @@ def write_to_gcs(
         + "\n"
     )
 
+    ### -------------------------------- load json data -------------------------------- ###
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     bucket.blob(blob_name).upload_from_string(payload, content_type="application/json")
@@ -47,12 +62,9 @@ def write_to_gcs(
     return f"gs://{bucket_name}/{blob_name}"
 
 
-def _json_default(value: Any) -> Any:
-    if isinstance(value, (datetime, date, time)):
-        return value.isoformat()
-    return str(value)
-
-
+# ---------------------------------------------------------------------------------------------
+# General function to load data from gcs; used in modules/functions/hyde_embedding.py
+# ---------------------------------------------------------------------------------------------
 def load_data_from_gcs_prefix(
     gcs_prefix: str,
     file_type: str = "json",
@@ -82,7 +94,7 @@ def load_data_from_gcs_prefix(
         if ext != target_type:
             continue
 
-        # Load based on file type
+        ### -------------------------------- load json data -------------------------------- ###
         if target_type == "json":
             content = blob.download_as_text()
             for line in content.splitlines():
@@ -101,6 +113,7 @@ def load_data_from_gcs_prefix(
                     break
             continue
 
+        ### --------------------------------- load txt data --------------------------------- ###
         if target_type == "txt":
             content = blob.download_as_text()
             for line in content.splitlines():
@@ -109,6 +122,7 @@ def load_data_from_gcs_prefix(
                     items.append(line)
             continue
 
+        ### --------------------------------- load npy data --------------------------------- ###
         if target_type == "npy":
             raw = blob.download_as_bytes()
             array = np.load(BytesIO(raw), allow_pickle=False)
