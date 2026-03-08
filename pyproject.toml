@@ -18,4 +18,5 @@ dependencies = [
     "pandas>=2.2.0",
     "httpx>=0.27.0",
     "locust>=2.31.0",
+    "pytest>=8.0.0",
 ]

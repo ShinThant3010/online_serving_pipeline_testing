@@ -1,0 +1,42 @@
+# gcloud builds submit
+
+steps:
+
+# 1️⃣ Build Docker image
+- name: gcr.io/cloud-builders/docker
+  args:
+    - build
+    - -t
+    - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/service
+    - .
+
+# 2️⃣ Push image to Artifact Registry
+- name: gcr.io/cloud-builders/docker
+  args:
+    - push
+    - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/service
+
+# 3️⃣ Deploy to Cloud Run
+- name: gcr.io/cloud-builders/gcloud
+  args:
+    - run
+    - deploy
+    - ${_REPO_NAME}
+    - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/service
+    - --min 1
+    - --memory=2Gi
+    - --cpu=2
+    - --region=${_REGION}
+    - --platform=managed
+    - --allow-unauthenticated
+    - --vpc-connector=${_VPC_CONNECTOR_NAME}
+    - --service-account=${_SA_NAME}@$PROJECT_ID.iam.gserviceaccount.com
+    - --set-env-vars REDISHOST=${_REDIS_HOST},REDISPORT=${_REDIS_PORT}
+
+substitutions:
+  _REGION: asia-southeast1
+  _REPO_NAME: online-serving-feeds-api
+  _VPC_CONNECTOR_NAME: redis-test-connector
+  _SA_NAME: test-result-data-api-sa
+  _REDIS_HOST: 10.86.221.99
+  _REDIS_PORT: 6379
