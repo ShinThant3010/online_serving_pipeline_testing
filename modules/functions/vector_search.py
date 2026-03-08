@@ -23,6 +23,8 @@ def _parse_project_and_region(index_endpoint: str) -> tuple[str, str]:
 
 
 class VectorSearchClient:
+
+    ### ------------------------------- initialize settings ------------------------------- ###
     def __init__(
         self,
         index_endpoint: str,
@@ -31,6 +33,10 @@ class VectorSearchClient:
         return_full_datapoint: bool = False,
         restricts_list: dict[str, Any] | None = None,
     ) -> None:
+        """
+        Initialize Vertex Matching Engine client settings and endpoint connection.
+        Also prebuild default namespace restrict filters from config input.
+        """
         self.index_endpoint = index_endpoint
         self.deployed_index_id = deployed_index_id
         self.neighbor_count = neighbor_count
@@ -42,8 +48,14 @@ class VectorSearchClient:
             index_endpoint_name=self.index_endpoint
         )
 
+
+    ### ------------------------- helper: format restricts for filtering ------------------------- ###
     @staticmethod
     def _build_restricts(restricts_list: dict[str, Any] | None) -> list[Any] | None:
+        """
+        Convert a namespace->tokens mapping into Vertex AI Namespace filters.
+        Returns None when input is empty/invalid or no usable tokens exist.
+        """
         if not isinstance(restricts_list, dict) or not restricts_list:
             return None
 
@@ -63,6 +75,10 @@ class VectorSearchClient:
 
         return restricts or None
 
+
+# ---------------------------------------------------------------------------------------------
+# main function: trigger hyde generation of student
+# ---------------------------------------------------------------------------------------------
     def search(self, embeddings: list[list[float]], restricts: list[Any] | None = None) -> list[dict[str, Any]]:
         """
         Performs a vector search using the Vertex AI Matching Engine.

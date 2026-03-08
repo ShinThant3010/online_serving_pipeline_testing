@@ -17,28 +17,51 @@ class HydeEmbeddingStore:
         self.metadata_prefix = metadata_prefix.strip("/")
 
     def _build_gcs_prefix(self, student_id: str, prefix: str) -> str:
+        """
+        Standardize GCS URI prefix in the form:
+        `gs://{bucket}/{student_id}/{prefix}`.
+
+        Leading/trailing slashes are removed from each segment and empty segments are skipped.
+        """
         return "gs://" + "/".join(
             part for part in [self.bucket, student_id.strip("/"), prefix.strip("/")] if part
         )
 
+    ### --------------------------- Validate loaded embeddings --------------------------- ###
     @staticmethod
-    def _to_valid_vector(item: Any) -> list[float] | None:
-        """Normalize a candidate embedding into a flat non-zero float vector."""
-        if not isinstance(item, list) or not item:
-            return None
+    def _to_valid_embeddings_payload(items: list[Any]) -> list[list[float]]:
+        """Normalize embeddings payload into a list of flat non-zero float vectors."""
+        if not items:
+            return []
 
-        # Some .npy payloads are a 2D matrix in one object: [[...], [...]].
-        if all(isinstance(row, list) for row in item):
-            return None
+        vectors: list[list[float]] = []
+        for item in items:
+            candidates = (
+                item
+                if isinstance(item, list) and item and all(isinstance(row, list) for row in item)
+                else [item]
+            )
+            for candidate in candidates:
+                if not isinstance(candidate, list) or not candidate:
+                    continue
 
-        try:
-            vector = [float(value) for value in item]
-        except (TypeError, ValueError):
-            return None
+                # 2D matrix nested deeper: [[[...], [...]]]
+                if all(isinstance(row, list) for row in candidate):
+                    continue
 
-        return vector if any(value != 0.0 for value in vector) else None
+                try:
+                    vector = [float(value) for value in candidate]
+                except (TypeError, ValueError):
+                    continue
 
-    def _normalize_hyde_query_payload(self, items: list[Any]) -> dict[str, Any]:
+                if any(value != 0.0 for value in vector):
+                    vectors.append(vector)
+
+        return vectors
+
+    ### --------------------------- Validate loaded hyde query --------------------------- ###
+    @staticmethod
+    def _to_valid_hyde_query_payload(items: list[Any]) -> dict[str, Any]:
         """
         Normalize query payload to {'hq': [query_dict, ...]} using basic structure checks.
         Supported input shapes:
@@ -60,33 +83,34 @@ class HydeEmbeddingStore:
         hq = [q for q in source if isinstance(q, dict)]
         return {"hq": hq} if hq else {}
 
-    def _normalize_metadata_payload(self, items: list[Any]) -> dict[str, Any]:
+    ### ---------------------------- Validate loaded metadata ---------------------------- ###
+    @staticmethod
+    def _to_valid_metadata_payload(items: list[Any]) -> dict[str, Any]:
         """
-        Normalize loaded metadata payload to a dict.
+        Validate metadata payload as a single student-profile dict.
         Returns {} for unsupported structures.
         """
-        if not items:
+        if not items or not isinstance(items[0], dict):
             return {}
 
-        first = items[0]
-        if isinstance(first, dict):
-            return first
+        payload = items[0]
 
-        if isinstance(first, list):
-            dict_rows = [row for row in first if isinstance(row, dict)]
-            return {"interaction": dict_rows} if dict_rows else {}
-
-        dict_items = [row for row in items if isinstance(row, dict)]
-        if not dict_items:
+        student_id = payload.get("student_id")
+        if not isinstance(student_id, str) or not student_id.strip():
             return {}
 
-        # If multiple dict records look like interaction rows, expose them under "interaction".
-        is_interaction_rows = all(
-            any(key in row for key in ("student_id", "user_id", "feed_id", "event_type"))
-            for row in dict_items
-        )
-        return {"interaction": dict_items} if is_interaction_rows else {"items": dict_items}
+        interaction = payload.get("interaction")
+        if interaction is not None:
+            if not isinstance(interaction, list):
+                return {}
+            payload["interaction"] = [row for row in interaction if isinstance(row, dict)]
 
+        return payload
+
+    
+# ---------------------------------------------------------------------------------------------
+# Load embeddings from hyde-data-lake
+# ---------------------------------------------------------------------------------------------
     def load_embeddings(self, student_id: str) -> list[list[float]]:
         """
         Load embeddings for a given student ID from GCS.
@@ -95,25 +119,13 @@ class HydeEmbeddingStore:
             return []
 
         gcs_prefix = self._build_gcs_prefix(student_id, self.embedding_prefix)
+        items = load_data_from_gcs_prefix(gcs_prefix,file_type="npy")
+        return self._to_valid_embeddings_payload(items)
 
-        items = load_data_from_gcs_prefix(
-            gcs_prefix,
-            file_type="npy",
-        )
-        if not items:
-            return []
 
-        vectors: list[list[float]] = []
-        for item in items:
-            candidates = item if isinstance(item, list) and item and all(isinstance(row, list) for row in item) else [item]
-            for candidate in candidates:
-                if (vector := self._to_valid_vector(candidate)) is not None:
-                    vectors.append(vector)
-
-        # if not vectors:
-            # print(f"No valid embeddings found for {student_id}.")
-        return vectors
-
+# ---------------------------------------------------------------------------------------------
+# Load hyDE query from hyde-data-lake
+# ---------------------------------------------------------------------------------------------
     def load_hyde_queries(self, student_id: str) -> dict[str, Any]:
         """
         Load and validate HyDE query payload for a given student ID from GCS.
@@ -123,8 +135,12 @@ class HydeEmbeddingStore:
 
         gcs_prefix = self._build_gcs_prefix(student_id, self.query_prefix)
         items = load_data_from_gcs_prefix(gcs_prefix, file_type="json")
-        return self._normalize_hyde_query_payload(items)
+        return self._to_valid_hyde_query_payload(items)
 
+
+# ---------------------------------------------------------------------------------------------
+# Load metadata from hyde-data-lake
+# ---------------------------------------------------------------------------------------------
     def load_metadata(self, student_id: str) -> dict[str, Any]:
         """
         Load and validate metadata payload for a given student ID from GCS.
@@ -134,4 +150,4 @@ class HydeEmbeddingStore:
 
         gcs_prefix = self._build_gcs_prefix(student_id, self.metadata_prefix)
         items = load_data_from_gcs_prefix(gcs_prefix, file_type="json")
-        return self._normalize_metadata_payload(items)
+        return self._to_valid_metadata_payload(items)

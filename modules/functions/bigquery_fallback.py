@@ -6,6 +6,9 @@ from api.schema import FeedsMetadata
 from modules.utils.bigquery import query_sql
 
 
+# ---------------------------------------------------------------------------------------------
+# bigquery - fallback
+# ---------------------------------------------------------------------------------------------
 def fetch_fallback_recommendations(
     bigquery_client: bigquery.Client,
     fallback_table: str,
