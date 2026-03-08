@@ -23,7 +23,7 @@ steps:
     - deploy
     - ${_REPO_NAME}
     - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/service
-    - --min 1
+    - --min-instances=1
     - --memory=2Gi
     - --cpu=2
     - --region=${_REGION}
@@ -31,12 +31,13 @@ steps:
     - --allow-unauthenticated
     - --vpc-connector=${_VPC_CONNECTOR_NAME}
     - --service-account=${_SA_NAME}@$PROJECT_ID.iam.gserviceaccount.com
-    - --set-env-vars REDISHOST=${_REDIS_HOST},REDISPORT=${_REDIS_PORT}
+    - --set-env-vars
+    - REDISHOST=${_REDIS_HOST},REDISPORT=${_REDIS_PORT}
 
 substitutions:
-  _REGION: asia-southeast1
-  _REPO_NAME: online-serving-feeds-api
-  _VPC_CONNECTOR_NAME: redis-test-connector
-  _SA_NAME: test-result-data-api-sa
-  _REDIS_HOST: 10.86.221.99
-  _REDIS_PORT: 6379
+  _REGION: "asia-southeast1"
+  _REPO_NAME: "online-serving-feeds-api"
+  _VPC_CONNECTOR_NAME: "redis-test-connector"
+  _SA_NAME: "test-result-data-api-sa"
+  _REDIS_HOST: "10.86.221.99"
+  _REDIS_PORT: "6379"

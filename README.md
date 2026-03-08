@@ -90,6 +90,10 @@ locustfile.py             # Load test scenario
 test_metrics/
   run_api_retrieval_metrics.py # Offline retrieval metric runner
   test_metrics_config.yaml
+tests/
+  conftest.py
+  test_recommendation_service.py
+  test_recommendation_helpers.py
 Dockerfile
 requirements.txt
 pyproject.toml
@@ -155,7 +159,24 @@ curl -X POST http://localhost:8080/recommendations \
   -d '{"student_id":"student_123"}'
 ```
 
-## 8. Build and Deploy to Cloud Run (Cloud Build)
+## 8. Run Tests
+
+Run all unit tests:
+```bash
+python -m pytest -q
+```
+
+Run only recommendation tests:
+```bash
+python -m pytest -q tests/test_recommendation_service.py tests/test_recommendation_helpers.py
+```
+
+Notes:
+- Prefer `python -m pytest` over `pytest` if your `.venv/bin/pytest` entrypoint points to an outdated path after a folder rename.
+- If test discovery reports `no tests ran`, confirm you are in the project root:
+  `online_serving_pipeline/`
+
+## 9. Build and Deploy to Cloud Run (Cloud Build)
 
 This repo includes `cloudbuild.yaml` that performs:
 1. Docker build
@@ -181,7 +202,7 @@ gcloud builds submit --config cloudbuild.yaml \
   --substitutions=_REGION=asia-southeast1,_REPO_NAME=<service-name>,_VPC_CONNECTOR_NAME=<vpc-connector>,_SA_NAME=<service-account-name>,_REDIS_HOST=<redis-host>,_REDIS_PORT=6379
 ```
 
-## 9. Load Testing (Locust)
+## 10. Load Testing (Locust)
 
 `locustfile.py` reads student IDs from:
 - `test_metrics/prep_stuid_locust/student_ids.csv`
@@ -196,7 +217,7 @@ locust -f locustfile.py --host http://localhost:8080
 
 Then open `http://localhost:8089`.
 
-## 10. Retrieval Quality Evaluation
+## 11. Retrieval Quality Evaluation
 
 Script:
 - `test_metrics/run_api_retrieval_metrics.py`
@@ -221,7 +242,7 @@ python test_metrics/run_api_retrieval_metrics.py --config test_metrics/test_metr
 
 Output CSV path is configured in `output.csv` in the metrics config.
 
-## 11. Observability
+## 12. Observability
 
 - Timing logs are emitted as JSON via `print` in `modules/utils/performance_logging.py`.
 - Sampling controlled by `app.perf_log_sample_rate` in `config.yaml`.
@@ -233,7 +254,7 @@ Output CSV path is configured in `output.csv` in the metrics config.
   - `t_postprocess`
   - `t_response_write`
 
-## 12. Common Failure Modes
+## 13. Common Failure Modes
 
 - Redis unreachable:
   - Cache calls fail gracefully and warnings are printed.
@@ -243,3 +264,18 @@ Output CSV path is configured in `output.csv` in the metrics config.
   - Runtime fallback to Redis/BigQuery recommendations.
 - BigQuery fallback table missing or schema invalid:
   - Raises runtime error (table must include `feed_id` column).
+
+## 14. Rename Notes (Project Folder)
+
+If this repository folder was renamed from `online_serving_pipeline_testing` to
+`online_serving_pipeline`, old virtualenv launcher scripts can still contain hardcoded
+absolute paths.
+
+Quick fix:
+```bash
+python -m pytest -q
+```
+
+Long-term fix:
+- recreate virtualenv (`rm -rf .venv && uv sync` or recreate with `python -m venv .venv`)
+- or refresh all `.venv/bin/*` entrypoints to the current project path
