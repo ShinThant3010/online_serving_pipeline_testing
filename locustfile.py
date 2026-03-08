@@ -1,4 +1,3 @@
-import os
 import random
 import csv
 from pathlib import Path
@@ -8,6 +7,7 @@ from pydantic import BaseModel
 
 
 def _load_student_ids_from_csv(csv_path: Path) -> list[str]:
+    """Load non-empty `student_id` values from a CSV file and return them as a list."""
     if not csv_path.exists():
         raise FileNotFoundError(f"Student ID CSV not found: {csv_path}")
 
@@ -23,13 +23,11 @@ def _load_student_ids_from_csv(csv_path: Path) -> list[str]:
         return values
 
 
-STUDENT_IDS = _load_student_ids_from_csv(Path("test_data_prep/prep_students/student_ids.csv"))
+STUDENT_IDS = _load_student_ids_from_csv(Path("test_metrics/prep_stuid_locust/student_ids.csv"))
 RECOMMEND_PATH = "/recommendations"
 
-LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/148170186959093760"
-LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_deployed"
-# LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/6458557689835290624"
-# LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_4replicas_deployed"
+LOCUST_VERTEX_INDEX_ENDPOINT = "projects/810737581373/locations/asia-southeast1/indexEndpoints/6458557689835290624"
+LOCUST_VERTEX_DEPLOYED_INDEX_ID = "feeds_20k_4replicas_deployed"
 
 
 class VertexRequest(BaseModel):
@@ -38,6 +36,7 @@ class VertexRequest(BaseModel):
 
 
 def _build_vertex_payload() -> dict[str, str] | None:
+    """Build optional Vertex override payload for recommendation requests."""
     if not LOCUST_VERTEX_INDEX_ENDPOINT and not LOCUST_VERTEX_DEPLOYED_INDEX_ID:
         return None
     vertex = VertexRequest(
@@ -52,6 +51,7 @@ class RecommendationUser(HttpUser):
 
     @task(5)
     def recommend(self) -> None:
+        """Send a recommendation request for a random student and validate response shape."""
         student_id = random.choice(STUDENT_IDS)
         payload = {"student_id": student_id}
         vertex_payload = _build_vertex_payload()

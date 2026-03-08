@@ -15,7 +15,8 @@ import httpx
 import yaml
 
 
-def load_config(config_path: Path) -> dict[str, Any]:
+def load_test_metrics_config(config_path: Path) -> dict[str, Any]:
+    """Load and validate YAML config for API retrieval-metrics evaluation."""
     with config_path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     if not isinstance(data, dict):
@@ -25,6 +26,7 @@ def load_config(config_path: Path) -> dict[str, Any]:
 
 
 def get_nested(cfg: dict[str, Any], key: str, default: Any = None) -> Any:
+    """Get a nested config value by dot-separated key path with a default fallback."""
     cur: Any = cfg
     for part in key.split("."):
         if not isinstance(cur, dict) or part not in cur:
@@ -34,6 +36,7 @@ def get_nested(cfg: dict[str, Any], key: str, default: Any = None) -> Any:
 
 
 def parse_gold_ids(row: dict[str, str]) -> list[str]:
+    """Extract gold feed IDs from a ground-truth CSV row."""
     gold_titles = (row.get("gold_titles") or "").strip()
     if gold_titles:
         try:
@@ -61,6 +64,7 @@ def parse_gold_ids(row: dict[str, str]) -> list[str]:
 
 
 def load_groundtruth(groundtruth_csv: Path) -> tuple[list[str], dict[str, list[str]]]:
+    """Load student IDs and their gold feed IDs from the ground-truth CSV file."""
     student_ids: list[str] = []
     student_to_gold: dict[str, list[str]] = {}
 
@@ -89,6 +93,7 @@ def load_groundtruth(groundtruth_csv: Path) -> tuple[list[str], dict[str, list[s
 
 
 def compute_metrics_at_k(predicted_ids: list[str], gold_ids: list[str], k: int) -> dict[str, float | int]:
+    """Compute MRR@K, Precision@K, Hit@K, and hit count for one student result."""
     top_k = predicted_ids[:k]
     gold_set = {x for x in gold_ids if x}
     if not gold_set:
@@ -110,6 +115,7 @@ def compute_metrics_at_k(predicted_ids: list[str], gold_ids: list[str], k: int) 
 
 
 def extract_candidates(response_json: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract recommendation candidate objects from API response payload."""
     raw = response_json.get("recommendations", [])
     if not isinstance(raw, list):
         return []
@@ -117,6 +123,7 @@ def extract_candidates(response_json: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def parse_header_latency_ms(headers: httpx.Headers) -> float | None:
+    """Parse `x-response-time-seconds` header and return latency in milliseconds."""
     value = headers.get("x-response-time-seconds")
     if value is None:
         return None
@@ -127,6 +134,7 @@ def parse_header_latency_ms(headers: httpx.Headers) -> float | None:
 
 
 def build_api_url(cfg: dict[str, Any]) -> str:
+    """Build full API URL from config values `api.base` and `api.route`."""
     base = str(get_nested(cfg, "api.base", "")).rstrip("/")
     route = str(get_nested(cfg, "api.route", "")).lstrip("/")
     if not base or not route:
@@ -135,6 +143,7 @@ def build_api_url(cfg: dict[str, Any]) -> str:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for config path and optional student evaluation limit."""
     parser = argparse.ArgumentParser(
         description="Call recommendation API for each student and compute retrieval metrics."
     )
@@ -153,8 +162,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run API evaluation for all target students and write detailed metrics to CSV."""
     args = parse_args()
-    cfg = load_config(Path(args.config))
+    cfg = load_test_metrics_config(Path(args.config))
 
     api_url = build_api_url(cfg)
     timeout_seconds = float(get_nested(cfg, "timeout_seconds", 60))
