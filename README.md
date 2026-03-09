@@ -152,7 +152,7 @@ Dependency outage behavior:
 - Purpose: return ranked recommendations for one student.
 - Response header includes `x-response-time-seconds` (server-side processing time).
 
-### 8.2 Request body, Response body
+### 8.2 Example - Request, Response
 
 Request:
 ```json
