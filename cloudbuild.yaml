@@ -23,7 +23,7 @@ steps:
     - deploy
     - ${_REPO_NAME}
     - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO_NAME}/service
-    - --min-instances=1
+    - --min=1
     - --memory=2Gi
     - --cpu=2
     - --region=${_REGION}
