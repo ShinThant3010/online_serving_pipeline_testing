@@ -137,3 +137,18 @@ def load_data_from_gcs_prefix(
             continue
 
     return items
+
+
+def load_json_from_gcs_uri(gcs_uri: str) -> Any | None:
+    """
+    Load a single JSON document from an exact GCS object URI.
+    """
+    bucket_name, blob_name = parse_gcs_prefix(gcs_uri)
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    if not blob.exists():
+        return None
+
+    return json.loads(blob.download_as_text())

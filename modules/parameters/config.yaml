@@ -10,7 +10,7 @@ cache:
   redis_timeout_seconds: 0.5
 
 hyde_data:
-  bucket: "hyde-datalake-feeds"
+  bucket: "hyde-datalake-test"
   embedding_prefix: embedding
   query_prefix: hyde
   metadata_prefix: metadata
