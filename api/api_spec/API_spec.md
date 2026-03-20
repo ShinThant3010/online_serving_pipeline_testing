@@ -106,7 +106,7 @@ Returns ranked feed recommendations for a single student.
 
 | Field | Type | Required | Notes | Examples
 | ----- | ---- | -------: | ----- | -----
-| studentId | string | ✅ | Non-empty student identifier | stu_p001, stu_p002
+| studentId | string | ✅ | Non-empty student identifier | stu_p208, stu_p303, stu_p370, stu_p388, stu_p390, stu_p401, stu_p477, stu_p484, stu_p497, stu_p545, stu_p556, stu_p613, stu_p627, stu_p686, stu_p699
 
 ### NOTE
 * The recommended feeds will be stored in cache for 1hr. If you want to reset feeds recommendation in cache, use following endpoint.
