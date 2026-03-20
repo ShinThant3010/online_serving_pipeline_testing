@@ -1,4 +1,4 @@
-# Feeds Recommendation API (REST API Spec)
+# Feeds Recommendation API - Core Engine (REST API Spec)
 
 Service: **online_serving_pipeline**
 
@@ -26,7 +26,7 @@ This API returns ranked feed recommendations for a student using a cache-first o
 `http://127.0.0.1:8080`
 
 **Swagger / OpenAPI:**  
-`http://127.0.0.1:8080/docs`
+`https://online-serving-feeds-api-810737581373.asia-southeast1.run.app/docs`
 
 ---
 

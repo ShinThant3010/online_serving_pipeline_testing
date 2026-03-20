@@ -4,22 +4,18 @@ from modules.utils.gcs import load_json_from_gcs_uri
 
 
 class HydeEmbeddingStore:
-    HYDE_BUNDLE_BUCKET = "hyde-datalake-test"
+    HYDE_BUNDLE_BUCKET = "hyde-datalake-feeds"
     HYDE_BUNDLE_FILENAME = "hyde_bundle.json"
 
     def __init__(
         self,
-        bucket: str,
-        embedding_prefix: str,
-        query_prefix: str,
-        metadata_prefix: str,
     ) -> None:
         self.bucket = self.HYDE_BUNDLE_BUCKET
 
     def _build_bundle_gcs_uri(self, student_id: str) -> str:
         """
         Standardize GCS object URI in the form:
-        `gs://hyde-datalake-test/{student_id}/hyde_bundle.json`.
+        `gs://hyde-datalake-feeds/{student_id}/hyde_bundle.json`.
         """
         clean_student_id = student_id.strip("/")
         return f"gs://{self.bucket}/{clean_student_id}/{self.HYDE_BUNDLE_FILENAME}"
