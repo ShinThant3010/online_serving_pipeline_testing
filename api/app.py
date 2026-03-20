@@ -1,4 +1,5 @@
 import time
+import uuid
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -13,6 +14,9 @@ from modules.utils.performance_logging import (
 )
 
 app = FastAPI(title="Feeds Recommendation API", version="0.1.0")
+
+API_VERSION_HEADER = "X-API-Version"
+CORRELATION_ID_HEADER = "X-Correlation-Id"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -32,8 +36,11 @@ def get_recommendation_service() -> RecommendationService:
 async def add_response_time_header(request, call_next):
     """Middleware to add response time header to each response."""
     started = time.perf_counter()
+    request.state.correlation_id = request.headers.get(CORRELATION_ID_HEADER) or f"corr_{uuid.uuid4()}"
     response = await call_next(request)
     response.headers["x-response-time-seconds"] = f"{time.perf_counter() - started:.6f}"
+    response.headers[API_VERSION_HEADER] = app.version
+    response.headers[CORRELATION_ID_HEADER] = request.state.correlation_id
     return response
 
 
@@ -49,7 +56,7 @@ def health() -> dict[str, str]:
 # ---------------------------------------------------------------------------------------------
 # API endpoint for getting recommendations
 # ---------------------------------------------------------------------------------------------
-@app.post("/recommendations", response_model=RecommendationResponse)
+@app.post("/recommendations", response_model=RecommendationResponse, response_model_by_alias=True)
 def recommend(
     request: Request,
     payload: RecommendationRequest,

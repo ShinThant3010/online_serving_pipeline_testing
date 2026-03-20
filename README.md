@@ -150,25 +150,26 @@ Dependency outage behavior:
 
 `POST /recommendations`
 - Purpose: return ranked recommendations for one student.
-- Response header includes `x-response-time-seconds` (server-side processing time).
+- Response headers include `x-response-time-seconds`, `X-API-Version`, and `X-Correlation-Id`.
+- Requests accept both `student_id` and `studentId`; declared response fields are emitted in camelCase.
 
 ### 8.2 Example - Request, Response
 
 Request:
 ```json
 {
-  "student_id": "student_123"
+  "studentId": "student_123"
 }
 ```
 
 Response example:
 ```json
 {
-  "student_id": "student_123",
+  "studentId": "student_123",
   "source": "vertex_vector_search",
   "recommendations": [
     {
-      "feed_id": "TH_FEED_001",
+      "feedId": "TH_FEED_001",
       "score": 0.923451,
       "metadata": {
         "title": "...",
@@ -180,9 +181,9 @@ Response example:
 ```
 
 Response fields:
-- `student_id`: echoed student id.
+- `studentId`: echoed student id.
 - `source`: serving source, e.g. `redis_cache`, `vertex_vector_search`, `redis_fallback`, `bigquery_fallback`, or combined source after top-up.
-- `recommendations`: ranked items with `feed_id`, `score`, and optional `metadata`.
+- `recommendations`: ranked items with `feedId`, `score`, and optional `metadata`.
 
 ### 8.3 Error Handling & Status Codes
 

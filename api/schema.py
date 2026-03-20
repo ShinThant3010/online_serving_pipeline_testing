@@ -1,9 +1,18 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+
+def to_camel(value: str) -> str:
+    parts = value.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+
+
+class APIModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
 # ---------------------------------------------------------------------------------------------
 # Request
 # ---------------------------------------------------------------------------------------------
-class RecommendationRequest(BaseModel):
+class RecommendationRequest(APIModel):
     student_id: str = Field(..., min_length=1)
 
 
@@ -15,13 +24,13 @@ class FeedsMetadata(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-class FeedsRecommendation(BaseModel):
+class FeedsRecommendation(APIModel):
     feed_id: str
     score: float
     metadata: FeedsMetadata | None = None
 
 
-class RecommendationResponse(BaseModel):
+class RecommendationResponse(APIModel):
     student_id: str
     source: str
     recommendations: list[FeedsRecommendation]
