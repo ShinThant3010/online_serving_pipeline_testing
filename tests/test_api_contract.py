@@ -21,6 +21,11 @@ class StubRecommendationService:
             t_cache_get=0.0,
             t_vector_search=0.0,
             t_postprocess=0.0,
+            t_fallback_prepare=0.0,
+            t_rerank=0.0,
+            t_metadata_fetch=0.0,
+            t_format_response=0.0,
+            t_top_up_merge=0.0,
         )
         return response, diagnostics
 

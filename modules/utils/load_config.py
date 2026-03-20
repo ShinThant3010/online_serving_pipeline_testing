@@ -26,9 +26,6 @@ class CacheConfig:
 @dataclass(frozen=True)
 class HydeDataConfig:
     bucket: str
-    embedding_prefix: str
-    query_prefix: str
-    metadata_prefix: str
 
 @dataclass(frozen=True)
 class VertexConfig:
@@ -146,9 +143,6 @@ def load_settings(config_path: str = "modules/parameters/config.yaml") -> Settin
         ),
         hyde_data=HydeDataConfig(
             bucket=str(hyde_data_cfg.get("bucket", "hyde-datalake-feeds")),
-            embedding_prefix=str(hyde_data_cfg.get("embedding_prefix", "embedding")),
-            query_prefix=str(hyde_data_cfg.get("query_prefix", "hyde")),
-            metadata_prefix=str(hyde_data_cfg.get("metadata_prefix", "metadata")),
         ),
         vertex=VertexConfig(
             index_endpoint=str(vertex_cfg.get("index_endpoint", "")),

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from api.schema import FeedsMetadata, FeedsRecommendation, RecommendationResponse
-from modules.core.recommend_feeds import RecommendationService
+from modules.core.recommend_feeds import PostprocessTimings, RecommendationService
 
 
 def _make_settings(minimum_recommendation: int = 3, fallback_limit: int = 5, ttl_seconds: int = 60):
@@ -62,12 +62,13 @@ def test_recommend_falls_back_and_triggers_refresh_when_embeddings_missing():
     service._get_cached_response = MagicMock(return_value=None)
     service.embedding_store.load_embeddings.return_value = []
     fallback = RecommendationResponse(student_id="s-2", source="bigquery_fallback", recommendations=[])
-    service._build_fallback_response = MagicMock(return_value=fallback)
+    service._build_fallback_response = MagicMock(return_value=(fallback, PostprocessTimings(t_fallback_prepare=0.1)))
 
     response, diagnostics = service.recommend("s-2")
 
     assert response == fallback
     assert diagnostics.cache_hit is False
+    assert diagnostics.t_fallback_prepare == 0.1
     service._build_fallback_response.assert_called_once_with(student_id="s-2", trigger_refresh=True)
     service.redis_cache.set_one.assert_not_called()
 
@@ -94,14 +95,22 @@ def test_recommend_tops_up_with_fallback_when_vector_results_below_minimum():
         ],
     )
 
-    service._build_vector_response = MagicMock(return_value=(vector_response, 0.01, 0.01))
-    service._build_fallback_response = MagicMock(return_value=fallback_response)
+    service._build_vector_response = MagicMock(
+        return_value=(vector_response, 0.01, PostprocessTimings(t_rerank=0.02, t_format_response=0.03))
+    )
+    service._build_fallback_response = MagicMock(
+        return_value=(fallback_response, PostprocessTimings(t_fallback_prepare=0.04, t_rerank=0.05))
+    )
 
     response, diagnostics = service.recommend("s-3")
 
     assert diagnostics.cache_hit is False
     assert response.source == "vertex_vector_search+bigquery_fallback"
     assert [item.feed_id for item in response.recommendations] == ["f-1", "f-2", "f-3"]
+    assert diagnostics.t_rerank == 0.07
+    assert diagnostics.t_fallback_prepare == 0.04
+    assert diagnostics.t_format_response == 0.03
+    assert diagnostics.t_top_up_merge >= 0.0
     service._build_fallback_response.assert_called_once_with(student_id="s-3", trigger_refresh=False)
     service.redis_cache.set_one.assert_called_once()
 
@@ -124,9 +133,12 @@ def test_build_fallback_response_uses_redis_cache_when_sufficient_feed_keys(monk
 
     monkeypatch.setattr("modules.core.recommend_feeds.rerank_with_subscore", fake_rerank_with_subscore)
 
-    response = service._build_fallback_response(student_id="s-4", trigger_refresh=False)
+    response, timings = service._build_fallback_response(student_id="s-4", trigger_refresh=False)
 
     assert response.source == "redis_fallback"
     assert [item.feed_id for item in response.recommendations] == ["f-2", "f-1"]
     assert all(isinstance(item.metadata, FeedsMetadata) for item in response.recommendations)
+    assert timings.t_fallback_prepare >= 0.0
+    assert timings.t_rerank >= 0.0
+    assert timings.t_format_response >= 0.0
     service.trigger_hyde_generation_service.trigger_hyde_generation.assert_not_called()

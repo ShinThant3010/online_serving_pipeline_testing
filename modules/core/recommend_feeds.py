@@ -31,6 +31,38 @@ class RecommendationDiagnostics:
     t_cache_get: float      # Time taken to attempt cache retrieval
     t_vector_search: float  # Time taken to perform vector search (if cache miss)
     t_postprocess: float    # Time taken for post-processing steps like reranking and formatting the response
+    t_fallback_prepare: float
+    t_rerank: float
+    t_metadata_fetch: float
+    t_format_response: float
+    t_top_up_merge: float
+
+
+@dataclass
+class PostprocessTimings:
+    t_fallback_prepare: float = 0.0
+    t_rerank: float = 0.0
+    t_metadata_fetch: float = 0.0
+    t_format_response: float = 0.0
+    t_top_up_merge: float = 0.0
+
+    def total(self) -> float:
+        return (
+            self.t_fallback_prepare
+            + self.t_rerank
+            + self.t_metadata_fetch
+            + self.t_format_response
+            + self.t_top_up_merge
+        )
+
+    def merged_with(self, other: "PostprocessTimings") -> "PostprocessTimings":
+        return PostprocessTimings(
+            t_fallback_prepare=self.t_fallback_prepare + other.t_fallback_prepare,
+            t_rerank=self.t_rerank + other.t_rerank,
+            t_metadata_fetch=self.t_metadata_fetch + other.t_metadata_fetch,
+            t_format_response=self.t_format_response + other.t_format_response,
+            t_top_up_merge=self.t_top_up_merge + other.t_top_up_merge,
+        )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -49,9 +81,6 @@ class RecommendationService:
 
         self.embedding_store = HydeEmbeddingStore(
             bucket=self.settings.hyde_data.bucket,
-            embedding_prefix=self.settings.hyde_data.embedding_prefix,
-            query_prefix=self.settings.hyde_data.query_prefix,
-            metadata_prefix=self.settings.hyde_data.metadata_prefix,
         )
 
         self.vector_search = VectorSearchClient(
@@ -82,9 +111,8 @@ class RecommendationService:
     ) -> tuple[RecommendationResponse, RecommendationDiagnostics]:
         """Get feed recommendations from cache, vector search, or fallback."""
         started = time.perf_counter()
-        t_cache_get = 0.0
+        postprocess_timings = PostprocessTimings()
         t_vector_search = 0.0
-        t_postprocess = 0.0
         cache_hit = False
 
         cache_key = self._key(student_id)
@@ -101,7 +129,12 @@ class RecommendationService:
                 t_total=time.perf_counter() - started,
                 t_cache_get=t_cache_get,
                 t_vector_search=t_vector_search,
-                t_postprocess=t_postprocess,
+                t_postprocess=postprocess_timings.total(),
+                t_fallback_prepare=postprocess_timings.t_fallback_prepare,
+                t_rerank=postprocess_timings.t_rerank,
+                t_metadata_fetch=postprocess_timings.t_metadata_fetch,
+                t_format_response=postprocess_timings.t_format_response,
+                t_top_up_merge=postprocess_timings.t_top_up_merge,
             )
             return cached_response, diagnostics
         ### --------------------------- return cached response --------------------------- ###
@@ -111,32 +144,39 @@ class RecommendationService:
 
         if not embeddings:
             # print(f"No embeddings found for {student_id}, activating fallback, trigger hyde generation...")
-            postprocess_started = time.perf_counter()
-            response = self._build_fallback_response(student_id=student_id, trigger_refresh=True)
-            t_postprocess = time.perf_counter() - postprocess_started
+            response, postprocess_timings = self._build_fallback_response(
+                student_id=student_id,
+                trigger_refresh=True,
+            )
             diagnostics = RecommendationDiagnostics(
                 cache_hit=cache_hit,
                 t_total=time.perf_counter() - started,
                 t_cache_get=t_cache_get,
                 t_vector_search=t_vector_search,
-                t_postprocess=t_postprocess,
+                t_postprocess=postprocess_timings.total(),
+                t_fallback_prepare=postprocess_timings.t_fallback_prepare,
+                t_rerank=postprocess_timings.t_rerank,
+                t_metadata_fetch=postprocess_timings.t_metadata_fetch,
+                t_format_response=postprocess_timings.t_format_response,
+                t_top_up_merge=postprocess_timings.t_top_up_merge,
             )
             return response, diagnostics
         ### --------------------- return no embedding fallback response --------------------- ###
 
         try:
             # print(f"Embeddings retrieved for {student_id}, proceeding with vector search...")
-            response, t_vector_search, t_postprocess = self._build_vector_response(
+            response, t_vector_search, postprocess_timings = self._build_vector_response(
                 student_id=student_id,
                 embeddings=embeddings,
             )
             minimum_recommendation = self.settings.recommendation.minimum_recommendation
             if len(response.recommendations) < minimum_recommendation:
-                postprocess_started = time.perf_counter()
-                fallback_response = self._build_fallback_response(
+                fallback_response, fallback_timings = self._build_fallback_response(
                     student_id=student_id,
                     trigger_refresh=False,
                 )
+                postprocess_timings = postprocess_timings.merged_with(fallback_timings)
+                top_up_started = time.perf_counter()
                 existing_feed_ids = {rec.feed_id for rec in response.recommendations}
                 topped_up_recommendations = list(response.recommendations)
 
@@ -153,7 +193,7 @@ class RecommendationService:
                     source=f"{response.source}+{fallback_response.source}",
                     recommendations=topped_up_recommendations,
                 )
-                t_postprocess += time.perf_counter() - postprocess_started
+                postprocess_timings.t_top_up_merge += time.perf_counter() - top_up_started
             ### ----- return vector search, but less than minimum recommendations response ------ ###
 
             self.redis_cache.set_one(
@@ -166,22 +206,33 @@ class RecommendationService:
                 t_total=time.perf_counter() - started,
                 t_cache_get=t_cache_get,
                 t_vector_search=t_vector_search,
-                t_postprocess=t_postprocess,
+                t_postprocess=postprocess_timings.total(),
+                t_fallback_prepare=postprocess_timings.t_fallback_prepare,
+                t_rerank=postprocess_timings.t_rerank,
+                t_metadata_fetch=postprocess_timings.t_metadata_fetch,
+                t_format_response=postprocess_timings.t_format_response,
+                t_top_up_merge=postprocess_timings.t_top_up_merge,
             )
             return response, diagnostics
             ### ------------------------- return vector search response ------------------------- ###
 
         except Exception as exc: 
             print(f"vector search fallback activated for {student_id}: {exc}")
-            postprocess_started = time.perf_counter()
-            response = self._build_fallback_response(student_id=student_id, trigger_refresh=False)
-            t_postprocess = time.perf_counter() - postprocess_started
+            response, postprocess_timings = self._build_fallback_response(
+                student_id=student_id,
+                trigger_refresh=False,
+            )
             diagnostics = RecommendationDiagnostics(
                 cache_hit=cache_hit,
                 t_total=time.perf_counter() - started,
                 t_cache_get=t_cache_get,
                 t_vector_search=t_vector_search,
-                t_postprocess=t_postprocess,
+                t_postprocess=postprocess_timings.total(),
+                t_fallback_prepare=postprocess_timings.t_fallback_prepare,
+                t_rerank=postprocess_timings.t_rerank,
+                t_metadata_fetch=postprocess_timings.t_metadata_fetch,
+                t_format_response=postprocess_timings.t_format_response,
+                t_top_up_merge=postprocess_timings.t_top_up_merge,
             )
             return response, diagnostics
             ### ------------------ return vector search fail; fallback response ------------------ ###
@@ -207,7 +258,7 @@ class RecommendationService:
         *,
         student_id: str,
         embeddings: list[list[float]],
-    ) -> tuple[RecommendationResponse, float, float]:
+    ) -> tuple[RecommendationResponse, float, PostprocessTimings]:
         """Build a recommendation response using vector search results."""
 
         ### ------------------------------------ async vector search ------------------------------------ ###
@@ -216,14 +267,17 @@ class RecommendationService:
         t_vector_search = time.perf_counter() - search_started
 
         ### ---- Adjust vector search result format to subscore format & call subscore calc function ----- ###
-        postprocess_started = time.perf_counter()
+        postprocess_timings = PostprocessTimings()
+        rerank_started = time.perf_counter()
         reranked = rerank_neighbors(
             student_id,
             search_results,
             embedding_store=self.embedding_store,
         )
+        postprocess_timings.t_rerank = time.perf_counter() - rerank_started
 
         ### -------------------------------------- prep metadata --------------------------------------- ###
+        metadata_started = time.perf_counter()
         feed_ids = [
             str(item["feed_id"])
             for item in reranked
@@ -237,20 +291,22 @@ class RecommendationService:
             }
         else:
             resolved_metadata_by_feed_id = {}
+        postprocess_timings.t_metadata_fetch = time.perf_counter() - metadata_started
 
 
         ### -------------- Convert reranked items to feed recommendations (final response) -------------- ###
+        format_started = time.perf_counter()
         recommendations = format_recommendations(
             reranked,
             metadata_by_feed_id=resolved_metadata_by_feed_id,
         )
-        t_postprocess = time.perf_counter() - postprocess_started
+        postprocess_timings.t_format_response = time.perf_counter() - format_started
         response = RecommendationResponse(
             student_id=student_id,
             source="vertex_vector_search",
             recommendations=recommendations,
         )
-        return response, t_vector_search, t_postprocess
+        return response, t_vector_search, postprocess_timings
 
 
 # ---------------------------------------------------------------------------------------------
@@ -261,8 +317,10 @@ class RecommendationService:
         *,
         student_id: str,
         trigger_refresh: bool,
-    ) -> RecommendationResponse:
+    ) -> tuple[RecommendationResponse, PostprocessTimings]:
         """Build a recommendation response using fallback data, optionally triggering a refresh of the HyDE generation."""
+        postprocess_timings = PostprocessTimings()
+        fallback_prepare_started = time.perf_counter()
 
         ### --------------------- trigger hyDE api call for no embeddings fallback --------------------- ###
         if trigger_refresh:
@@ -296,15 +354,19 @@ class RecommendationService:
 
         metadata_by_feed_id = {feed_id: metadata for feed_id, metadata in fallback_items}
         feed_ids = [feed_id for feed_id, _ in fallback_items]
+        postprocess_timings.t_fallback_prepare = time.perf_counter() - fallback_prepare_started
 
         ### ------------------- prep for subscore calc & call subscore calc function ------------------- ###
+        rerank_started = time.perf_counter()
         reranked = rerank_with_subscore(
             student_id=student_id,
             feed_matrix=[feed_ids] if feed_ids else [],
             embedding_store=self.embedding_store,
         )
+        postprocess_timings.t_rerank = time.perf_counter() - rerank_started
 
         ### -------------- Convert reranked items to feed recommendations (final response) -------------- ###
+        format_started = time.perf_counter()
         if reranked:
             recommendations = format_recommendations(
                 reranked,
@@ -319,9 +381,13 @@ class RecommendationService:
                 )
                 for feed_id, metadata in fallback_items
             ]
+        postprocess_timings.t_format_response = time.perf_counter() - format_started
 
-        return RecommendationResponse(
-            student_id=student_id,
-            source=fallback_source,
-            recommendations=recommendations,
+        return (
+            RecommendationResponse(
+                student_id=student_id,
+                source=fallback_source,
+                recommendations=recommendations,
+            ),
+            postprocess_timings,
         )

@@ -88,6 +88,11 @@ def recommend(
             t_cache_get=diagnostics.t_cache_get,
             t_vector_search=diagnostics.t_vector_search,
             t_postprocess=diagnostics.t_postprocess,
+            t_fallback_prepare=diagnostics.t_fallback_prepare,
+            t_rerank=diagnostics.t_rerank,
+            t_metadata_fetch=diagnostics.t_metadata_fetch,
+            t_format_response=diagnostics.t_format_response,
+            t_top_up_merge=diagnostics.t_top_up_merge,
             t_response_write=t_response_write,
         )
         return response

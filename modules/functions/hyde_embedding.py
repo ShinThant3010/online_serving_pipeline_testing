@@ -9,8 +9,9 @@ class HydeEmbeddingStore:
 
     def __init__(
         self,
+        bucket: str | None = None,
     ) -> None:
-        self.bucket = self.HYDE_BUNDLE_BUCKET
+        self.bucket = (bucket or self.HYDE_BUNDLE_BUCKET).strip()
 
     def _build_bundle_gcs_uri(self, student_id: str) -> str:
         """

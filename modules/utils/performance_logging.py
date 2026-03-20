@@ -41,6 +41,11 @@ def emit_recommendation_timing_log(
     t_cache_get: float,
     t_vector_search: float,
     t_postprocess: float,
+    t_fallback_prepare: float,
+    t_rerank: float,
+    t_metadata_fetch: float,
+    t_format_response: float,
+    t_top_up_merge: float,
     t_response_write: float,
 ) -> None:
     if not should_log_request(sample_rate):
@@ -59,6 +64,11 @@ def emit_recommendation_timing_log(
                 "t_cache_get": round(t_cache_get, 6),
                 "t_vector_search": round(t_vector_search, 6),
                 "t_postprocess": round(t_postprocess, 6),
+                "t_fallback_prepare": round(t_fallback_prepare, 6),
+                "t_rerank": round(t_rerank, 6),
+                "t_metadata_fetch": round(t_metadata_fetch, 6),
+                "t_format_response": round(t_format_response, 6),
+                "t_top_up_merge": round(t_top_up_merge, 6),
                 "t_response_write": round(t_response_write, 6),
             },
             ensure_ascii=True,

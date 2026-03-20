@@ -306,6 +306,11 @@ Deployed endpoint (current):
   - `t_cache_get`
   - `t_vector_search`
   - `t_postprocess`
+  - `t_fallback_prepare`
+  - `t_rerank`
+  - `t_metadata_fetch`
+  - `t_format_response`
+  - `t_top_up_merge`
   - `t_response_write`
 
 ## 13. Common Troubleshootings
