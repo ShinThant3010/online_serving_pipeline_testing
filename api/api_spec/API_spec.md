@@ -110,8 +110,8 @@ Returns ranked feed recommendations for a single student.
 
 ### NOTE
 * The recommended feeds will be stored in cache for 1hr. If you want to reset feeds recommendation in cache, use following endpoint.
-- API: `https://hyde-cache-pipeline-api-810737581373.asia-southeast1.run.app/docs` 
-- endpoint: `DELETE /cache/delete-prefix/{cache_prefix}` with "recommendations" as prefix
+  * API: `https://hyde-cache-pipeline-api-810737581373.asia-southeast1.run.app/docs` 
+  * endpoint: `DELETE /cache/delete-prefix/{cache_prefix}` with "recommendations" as prefix
 
 ### Successful Response
 
