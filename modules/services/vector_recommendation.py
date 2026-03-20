@@ -14,7 +14,7 @@ def search_neighbors_async(
     embeddings: list[list[float]],
     *,
     vector_search: VectorSearchClient,
-) -> list[list[dict[str, Any]]]:
+) -> tuple[list[list[dict[str, Any]]], list[int]]:
     """Search neighbors asynchronously, falling back to sync when needed."""
 
     async def _run() -> list[list[dict[str, Any]]]:
@@ -29,11 +29,18 @@ def search_neighbors_async(
 
     try:
         # print("Attempting asynchronous vector search...")
-        return asyncio.run(_run())
+        search_results = asyncio.run(_run())
 
     except RuntimeError:
         # print("Async vector search failed, falling back to synchronous search.")
-        return [vector_search.search([embedding]) for embedding in embeddings if embedding]
+        search_results = [vector_search.search([embedding]) for embedding in embeddings if embedding]
+
+    num_recommendations = [
+        len(neighbors)
+        for neighbors in search_results
+        if isinstance(neighbors, list)
+    ]
+    return search_results, num_recommendations
 
 
 # ---------------------------------------------------------------------------------------------

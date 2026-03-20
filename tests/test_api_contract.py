@@ -15,6 +15,7 @@ class StubRecommendationService:
             student_id=student_id,
             source="redis_cache",
             recommendations=[FeedsRecommendation(feed_id="feed-1", score=0.99)],
+            num_recommendations=1,
         )
         diagnostics = SimpleNamespace(
             cache_hit=True,
@@ -26,6 +27,7 @@ class StubRecommendationService:
             t_metadata_fetch=0.0,
             t_format_response=0.0,
             t_top_up_merge=0.0,
+            num_recommendations=[],
         )
         return response, diagnostics
 
@@ -60,4 +62,5 @@ def test_recommendations_accept_camel_case_request_and_return_camel_case_respons
         "studentId": "student-123",
         "source": "redis_cache",
         "recommendations": [{"feedId": "feed-1", "score": 0.99, "metadata": None}],
+        "numRecommendations": 1,
     }

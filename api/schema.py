@@ -34,3 +34,4 @@ class RecommendationResponse(APIModel):
     student_id: str
     source: str
     recommendations: list[FeedsRecommendation]
+    num_recommendations: int

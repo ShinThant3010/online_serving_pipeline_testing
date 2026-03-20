@@ -93,6 +93,7 @@ def recommend(
             t_metadata_fetch=diagnostics.t_metadata_fetch,
             t_format_response=diagnostics.t_format_response,
             t_top_up_merge=diagnostics.t_top_up_merge,
+            num_recommendations=diagnostics.num_recommendations,
             t_response_write=t_response_write,
         )
         return response

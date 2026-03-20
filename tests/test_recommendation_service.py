@@ -46,6 +46,7 @@ def test_recommend_returns_cached_response_when_available():
         student_id="s-1",
         source="redis_cache",
         recommendations=[FeedsRecommendation(feed_id="f-1", score=0.9)],
+        num_recommendations=1,
     )
     service._get_cached_response = MagicMock(return_value=cached)
 
@@ -61,7 +62,12 @@ def test_recommend_falls_back_and_triggers_refresh_when_embeddings_missing():
     service = _make_service()
     service._get_cached_response = MagicMock(return_value=None)
     service.embedding_store.load_embeddings.return_value = []
-    fallback = RecommendationResponse(student_id="s-2", source="bigquery_fallback", recommendations=[])
+    fallback = RecommendationResponse(
+        student_id="s-2",
+        source="bigquery_fallback",
+        recommendations=[],
+        num_recommendations=0,
+    )
     service._build_fallback_response = MagicMock(return_value=(fallback, PostprocessTimings(t_fallback_prepare=0.1)))
 
     response, diagnostics = service.recommend("s-2")
@@ -85,6 +91,7 @@ def test_recommend_tops_up_with_fallback_when_vector_results_below_minimum():
             FeedsRecommendation(feed_id="f-1", score=0.8),
             FeedsRecommendation(feed_id="f-2", score=0.7),
         ],
+        num_recommendations=2,
     )
     fallback_response = RecommendationResponse(
         student_id="s-3",
@@ -93,10 +100,11 @@ def test_recommend_tops_up_with_fallback_when_vector_results_below_minimum():
             FeedsRecommendation(feed_id="f-2", score=0.2),
             FeedsRecommendation(feed_id="f-3", score=0.1),
         ],
+        num_recommendations=2,
     )
 
     service._build_vector_response = MagicMock(
-        return_value=(vector_response, 0.01, PostprocessTimings(t_rerank=0.02, t_format_response=0.03))
+        return_value=(vector_response, 0.01, PostprocessTimings(t_rerank=0.02, t_format_response=0.03), [2])
     )
     service._build_fallback_response = MagicMock(
         return_value=(fallback_response, PostprocessTimings(t_fallback_prepare=0.04, t_rerank=0.05))
@@ -107,6 +115,7 @@ def test_recommend_tops_up_with_fallback_when_vector_results_below_minimum():
     assert diagnostics.cache_hit is False
     assert response.source == "vertex_vector_search+bigquery_fallback"
     assert [item.feed_id for item in response.recommendations] == ["f-1", "f-2", "f-3"]
+    assert response.num_recommendations == 3
     assert diagnostics.t_rerank == 0.07
     assert diagnostics.t_fallback_prepare == 0.04
     assert diagnostics.t_format_response == 0.03

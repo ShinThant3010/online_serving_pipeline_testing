@@ -36,6 +36,7 @@ class RecommendationDiagnostics:
     t_metadata_fetch: float
     t_format_response: float
     t_top_up_merge: float
+    num_recommendations: list[int]
 
 
 @dataclass
@@ -135,6 +136,7 @@ class RecommendationService:
                 t_metadata_fetch=postprocess_timings.t_metadata_fetch,
                 t_format_response=postprocess_timings.t_format_response,
                 t_top_up_merge=postprocess_timings.t_top_up_merge,
+                num_recommendations=[],
             )
             return cached_response, diagnostics
         ### --------------------------- return cached response --------------------------- ###
@@ -159,13 +161,14 @@ class RecommendationService:
                 t_metadata_fetch=postprocess_timings.t_metadata_fetch,
                 t_format_response=postprocess_timings.t_format_response,
                 t_top_up_merge=postprocess_timings.t_top_up_merge,
+                num_recommendations=[],
             )
             return response, diagnostics
         ### --------------------- return no embedding fallback response --------------------- ###
 
         try:
             # print(f"Embeddings retrieved for {student_id}, proceeding with vector search...")
-            response, t_vector_search, postprocess_timings = self._build_vector_response(
+            response, t_vector_search, postprocess_timings, num_recommendations = self._build_vector_response(
                 student_id=student_id,
                 embeddings=embeddings,
             )
@@ -192,6 +195,7 @@ class RecommendationService:
                     student_id=student_id,
                     source=f"{response.source}+{fallback_response.source}",
                     recommendations=topped_up_recommendations,
+                    num_recommendations=len(topped_up_recommendations),
                 )
                 postprocess_timings.t_top_up_merge += time.perf_counter() - top_up_started
             ### ----- return vector search, but less than minimum recommendations response ------ ###
@@ -212,6 +216,7 @@ class RecommendationService:
                 t_metadata_fetch=postprocess_timings.t_metadata_fetch,
                 t_format_response=postprocess_timings.t_format_response,
                 t_top_up_merge=postprocess_timings.t_top_up_merge,
+                num_recommendations=num_recommendations,
             )
             return response, diagnostics
             ### ------------------------- return vector search response ------------------------- ###
@@ -233,6 +238,7 @@ class RecommendationService:
                 t_metadata_fetch=postprocess_timings.t_metadata_fetch,
                 t_format_response=postprocess_timings.t_format_response,
                 t_top_up_merge=postprocess_timings.t_top_up_merge,
+                num_recommendations=[],
             )
             return response, diagnostics
             ### ------------------ return vector search fail; fallback response ------------------ ###
@@ -246,7 +252,14 @@ class RecommendationService:
         cached = self.redis_cache.get_one(cache_key)
         if not cached:
             return None
-        payload = {**cached, "source": "redis_cache"}
+        cached_recommendations = cached.get("recommendations")
+        payload = {
+            **cached,
+            "source": "redis_cache",
+            "num_recommendations": (
+                len(cached_recommendations) if isinstance(cached_recommendations, list) else 0
+            ),
+        }
         return RecommendationResponse(**payload)
 
 
@@ -258,12 +271,15 @@ class RecommendationService:
         *,
         student_id: str,
         embeddings: list[list[float]],
-    ) -> tuple[RecommendationResponse, float, PostprocessTimings]:
+    ) -> tuple[RecommendationResponse, float, PostprocessTimings, list[int]]:
         """Build a recommendation response using vector search results."""
 
         ### ------------------------------------ async vector search ------------------------------------ ###
         search_started = time.perf_counter()
-        search_results = search_neighbors_async(embeddings, vector_search=self.vector_search)
+        search_results, num_recommendations = search_neighbors_async(
+            embeddings,
+            vector_search=self.vector_search,
+        )
         t_vector_search = time.perf_counter() - search_started
 
         ### ---- Adjust vector search result format to subscore format & call subscore calc function ----- ###
@@ -305,8 +321,9 @@ class RecommendationService:
             student_id=student_id,
             source="vertex_vector_search",
             recommendations=recommendations,
+            num_recommendations=len(recommendations),
         )
-        return response, t_vector_search, postprocess_timings
+        return response, t_vector_search, postprocess_timings, num_recommendations
 
 
 # ---------------------------------------------------------------------------------------------
@@ -388,6 +405,7 @@ class RecommendationService:
                 student_id=student_id,
                 source=fallback_source,
                 recommendations=recommendations,
+                num_recommendations=len(recommendations),
             ),
             postprocess_timings,
         )

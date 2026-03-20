@@ -46,6 +46,7 @@ def emit_recommendation_timing_log(
     t_metadata_fetch: float,
     t_format_response: float,
     t_top_up_merge: float,
+    num_recommendations: list[int],
     t_response_write: float,
 ) -> None:
     if not should_log_request(sample_rate):
@@ -69,6 +70,7 @@ def emit_recommendation_timing_log(
                 "t_metadata_fetch": round(t_metadata_fetch, 6),
                 "t_format_response": round(t_format_response, 6),
                 "t_top_up_merge": round(t_top_up_merge, 6),
+                "num_recommendations": num_recommendations,
                 "t_response_write": round(t_response_write, 6),
             },
             ensure_ascii=True,
