@@ -642,7 +642,11 @@ def load_user_interactions(interactions_path:str,*,student_id:str) -> pd.DataFra
 def load_feeds_meta_map(feed_ids: List[str],url_path:str) -> Dict[str, Dict[str, Any]]:
     url = url_path
 
+    feed_ids = [f"feeds:{feed_id}" for feed_id in feed_ids]
+
     payload = {"ids": feed_ids}
+
+    # print(payload)
 
     headers = {
         "accept": "application/json",
@@ -653,8 +657,15 @@ def load_feeds_meta_map(feed_ids: List[str],url_path:str) -> Dict[str, Dict[str,
         resp = requests.post(url, json=payload, headers=headers, timeout=30)
         resp.raise_for_status()
         data = resp.json()
+        items = data.get("items", {})
 
-        return data.get("items", {})
+        # convert keys back: "feeds:EN_F028" -> "EN_F028"
+        normalized_items = {}
+        for k, v in items.items():
+            raw_id = k.replace("feeds:", "", 1)
+            normalized_items[raw_id] = v
+
+        return normalized_items
 
     except Exception as e:
         # print(f"[load_feeds_meta_map] API error: {e}")
