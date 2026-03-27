@@ -27,7 +27,7 @@ vertex:
 
 bigquery:
   fallback_table: "poc-piloturl-nonprod.gold_layer.feeds_20k"
-  fallback_limit: 50
+  fallback_limit: 100
 
 trigger_hyde_generation:
   http_timeout_seconds: 60
@@ -36,4 +36,4 @@ trigger_hyde_generation:
   recommendation_path: "/hyde/students/{student_id}"
 
 recommendation:
-  minimum_recommendation: 3
+  minimum_recommendation: 20

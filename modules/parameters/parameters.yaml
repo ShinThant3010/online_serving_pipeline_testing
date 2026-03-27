@@ -94,8 +94,8 @@ hyde:
 # Retrieval configuration (USED in POC)
 # --------------------------------------------------------------------------------------
 retrieval:
-  top_k_per_query: 30
-  max_candidates: 10
+  top_k_per_query: 100
+  max_candidates: 100
   agg_mode: WEIGHTED_MAX          # WEIGHTED_MAX | WEIGHTED_MEAN
   recency_half_life_days: 30.0
   include_feed_header: true       # include feed_header field in candidates
@@ -144,7 +144,7 @@ scoring:
 eprotection:
   # score
   num_queries: 5
-  candidate_queries : 50
+  candidate_queries : 100
   # hq
   fallback_hq_weights: [1.0, 1.0, 1.0, 0.6, 0.6]
   fallback_intent_label: "fallback"
